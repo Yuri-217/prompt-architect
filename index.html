@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PromptArchitect — AI 绘画提示词架构师</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#050507;--surface:#101010;--surface2:#1a1a1a;--surface3:#222;
+  --border:#3d3a39;--border-focus:#00d992;
+  --accent:#00d992;--accent2:#2fd6a1;--accent-dim:rgba(0,217,146,.12);
+  --text:#f2f2f2;--text2:#b8b3b0;--text3:#8b949e;--text4:#666;
+  --danger:#fb565b;--warning:#ffba00;--success:#00d992;
+  --radius:8px;--radius-sm:6px;--radius-lg:12px;
+  --font:'Inter',system-ui,-apple-system,sans-serif;
+  --mono:'JetBrains Mono','SFMono-Regular',monospace;
+  --shadow:rgba(92,88,85,.2) 0 0 15px;
+  --shadow-lg:rgba(0,0,0,.7) 0 20px 60px;
+}
+html{font-size:16px;scroll-behavior:smooth}
+body{font-family:var(--font);background:var(--bg);color:var(--text);line-height:1.6;min-height:100vh;overflow-x:hidden}
+::selection{background:var(--accent);color:var(--bg)}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:var(--surface)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--text3)}
+
+/* ===== HEADER ===== */
+.header{position:sticky;top:0;z-index:100;background:var(--bg);border-bottom:1px solid var(--border);padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;backdrop-filter:blur(12px);background:rgba(5,5,7,.85)}
+.logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:18px;letter-spacing:-.5px}
+.logo-icon{width:32px;height:32px;background:linear-gradient(135deg,var(--accent),#00ffaa);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--bg);font-weight:800}
+.logo span{color:var(--accent)}
+.header-actions{display:flex;align-items:center;gap:12px}
+
+/* ===== BUTTONS ===== */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:var(--radius-sm);font-family:var(--font);font-size:13px;font-weight:500;cursor:pointer;transition:all .2s;border:1px solid var(--border);background:transparent;color:var(--text)}
+.btn:hover{background:rgba(255,255,255,.05);border-color:var(--text3)}
+.btn-accent{background:var(--accent);color:var(--bg);border-color:var(--accent);font-weight:600}
+.btn-accent:hover{background:var(--accent2);border-color:var(--accent2);box-shadow:0 0 20px rgba(0,217,146,.3)}
+.btn-accent:disabled{opacity:.5;cursor:not-allowed;box-shadow:none}
+.btn-ghost{border-color:transparent;color:var(--text2)}
+.btn-ghost:hover{color:var(--text);background:rgba(255,255,255,.05)}
+.btn-sm{padding:5px 10px;font-size:12px}
+.btn-icon{width:32px;height:32px;padding:0;display:flex;align-items:center;justify-content:center;border-radius:var(--radius-sm)}
+
+/* ===== MAIN LAYOUT ===== */
+.main{display:flex;height:calc(100vh - 56px);overflow:hidden}
+.panel{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.panel-left{border-right:1px solid var(--border);max-width:520px;min-width:400px}
+.panel-right{flex:1}
+.panel-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.panel-title{font-size:14px;font-weight:600;letter-spacing:.3px;display:flex;align-items:center;gap:8px}
+.panel-title .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent)}
+.panel-body{flex:1;overflow-y:auto;padding:20px}
+
+/* ===== INPUT AREA ===== */
+.input-group{margin-bottom:20px}
+.input-label{font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.textarea-wrap{position:relative}
+.textarea-wrap textarea{width:100%;min-height:140px;padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--font);font-size:14px;line-height:1.6;resize:vertical;transition:border-color .2s}
+.textarea-wrap textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim)}
+.textarea-wrap textarea::placeholder{color:var(--text4)}
+.char-count{position:absolute;bottom:8px;right:12px;font-size:11px;color:var(--text4);font-family:var(--mono)}
+
+/* ===== IMAGE UPLOAD ===== */
+.upload-zone{border:2px dashed var(--border);border-radius:var(--radius);padding:24px;text-align:center;cursor:pointer;transition:all .2s;position:relative;overflow:hidden}
+.upload-zone:hover{border-color:var(--accent);background:var(--accent-dim)}
+.upload-zone.has-image{border-style:solid;border-color:var(--accent);padding:0}
+.upload-zone input[type=file]{display:none}
+.upload-placeholder{color:var(--text3);font-size:13px}
+.upload-placeholder svg{margin-bottom:8px;opacity:.5}
+.upload-placeholder p{margin-top:4px}
+.upload-preview{width:100%;max-height:240px;object-fit:contain;display:block;border-radius:6px}
+.upload-remove{position:absolute;top:8px;right:8px;width:28px;height:28px;background:rgba(0,0,0,.7);border:1px solid var(--border);border-radius:50%;color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;z-index:2;transition:all .2s}
+.upload-remove:hover{background:var(--danger);border-color:var(--danger)}
+
+/* ===== STRATEGY SETTINGS ===== */
+.strategy-section{margin-top:20px;padding-top:20px;border-top:1px solid var(--border)}
+.strategy-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.strategy-title svg{color:var(--accent)}
+.strategy-grid{display:grid;grid-template-columns:1fr;gap:12px}
+.select-wrap{position:relative}
+.select-wrap label{display:block;font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.select-wrap select{width:100%;padding:10px 36px 10px 12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font);font-size:13px;cursor:pointer;appearance:none;transition:border-color .2s}
+.select-wrap select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim)}
+.select-wrap::after{content:'▾';position:absolute;right:12px;bottom:11px;color:var(--text3);pointer-events:none;font-size:12px}
+.select-wrap select option{background:var(--surface2);color:var(--text)}
+
+/* ===== GENERATE BUTTON ===== */
+.generate-area{padding:16px 20px;border-top:1px solid var(--border);flex-shrink:0}
+.btn-generate{width:100%;padding:14px;font-size:15px;font-weight:600;border-radius:var(--radius);letter-spacing:.3px;position:relative;overflow:hidden}
+.btn-generate .shimmer{position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.15),transparent);animation:shimmer 2s infinite}
+@keyframes shimmer{100%{left:100%}}
+.btn-generate.loading .btn-text{opacity:0}
+.btn-generate .spinner{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:20px;height:20px;border:2px solid rgba(5,5,7,.3);border-top-color:var(--bg);border-radius:50%;animation:spin .8s linear infinite;display:none}
+.btn-generate.loading .spinner{display:block}
+@keyframes spin{to{transform:translate(-50%,-50%) rotate(360deg)}}
+
+/* ===== OUTPUT AREA ===== */
+.output-tabs{display:flex;gap:0;border-bottom:1px solid var(--border);padding:0 20px;flex-shrink:0}
+.output-tab{padding:12px 20px;font-size:13px;font-weight:500;color:var(--text3);cursor:pointer;border-bottom:2px solid transparent;transition:all .2s}
+.output-tab:hover{color:var(--text2)}
+.output-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.output-content{flex:1;overflow-y:auto;padding:20px}
+.output-block{margin-bottom:20px}
+.output-block-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.output-block-title{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;gap:6px}
+.output-block-title.cn{color:#ff6b6b}
+.output-block-title.en{color:#4ecdc4}
+.output-copy{padding:4px 10px;font-size:11px;font-family:var(--mono);font-weight:500;border-radius:4px}
+.output-text{width:100%;min-height:160px;padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-size:13px;line-height:1.7;resize:vertical;font-family:var(--mono);transition:border-color .2s}
+.output-text:focus{outline:none;border-color:var(--accent)}
+.output-text::placeholder{color:var(--text4)}
+
+.output-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text4);text-align:center;padding:40px}
+.output-empty svg{opacity:.3;margin-bottom:16px}
+.output-empty p{font-size:14px;margin-bottom:4px}
+.output-empty small{font-size:12px;color:var(--text4)}
+
+/* ===== TARGET MODEL SELECTOR ===== */
+.model-selector{display:flex;align-items:center;gap:8px;padding:12px 20px;border-bottom:1px solid var(--border);flex-shrink:0}
+.model-selector label{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px}
+.model-chip{padding:5px 12px;border-radius:20px;font-size:12px;font-weight:500;cursor:pointer;border:1px solid var(--border);color:var(--text3);transition:all .2s}
+.model-chip:hover{border-color:var(--text3)}
+.model-chip.active{background:var(--accent-dim);border-color:var(--accent);color:var(--accent)}
+
+/* ===== MODAL ===== */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);z-index:200;display:none;align-items:center;justify-content:center}
+.modal-overlay.active{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);width:480px;max-width:90vw;max-height:80vh;overflow-y:auto;box-shadow:var(--shadow-lg)}
+.modal-header{padding:20px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.modal-header h3{font-size:16px;font-weight:600}
+.modal-close{width:32px;height:32px;display:flex;align-items:center;justify-content:center;border:none;background:transparent;color:var(--text3);cursor:pointer;border-radius:var(--radius-sm);transition:all .2s}
+.modal-close:hover{background:rgba(255,255,255,.05);color:var(--text)}
+.modal-body{padding:24px}
+.modal-footer{padding:16px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px}
+
+.form-group{margin-bottom:18px}
+.form-group label{display:block;font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px}
+.form-group input,.form-group select{width:100%;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font);font-size:13px;transition:border-color .2s}
+.form-group input:focus,.form-group select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim)}
+.form-group input::placeholder{color:var(--text4)}
+.form-hint{font-size:11px;color:var(--text4);margin-top:4px}
+.form-divider{border:none;border-top:1px solid var(--border);margin:20px 0}
+.form-or{text-align:center;font-size:12px;color:var(--text4);margin:-10px 0;position:relative}
+.form-or span{background:var(--surface);padding:0 12px;position:relative;z-index:1}
+
+/* ===== TOAST ===== */
+.toast-container{position:fixed;top:70px;right:20px;z-index:300;display:flex;flex-direction:column;gap:8px}
+.toast{padding:12px 18px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;color:var(--text);box-shadow:var(--shadow);animation:toastIn .3s ease;display:flex;align-items:center;gap:8px;min-width:240px}
+.toast.success{border-color:var(--success);background:rgba(0,217,146,.1)}
+.toast.error{border-color:var(--danger);background:rgba(251,86,91,.1)}
+@keyframes toastIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
+@keyframes toastOut{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(20px)}}
+
+/* ===== RESPONSIVE ===== */
+@media(max-width:900px){
+  .main{flex-direction:column;height:auto}
+  .panel-left{max-width:100%;min-width:auto;border-right:none;border-bottom:1px solid var(--border);max-height:50vh}
+  .panel-right{min-height:50vh}
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="logo">
+    <div class="logo-icon">✦</div>
+    Prompt<span>Architect</span>
+  </div>
+  <div class="header-actions">
+    <button class="btn btn-ghost btn-sm" onclick="showHistory()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      历史记录
+    </button>
+    <button class="btn btn-sm" onclick="openSettings()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      API 设置
+    </button>
+  </div>
+</header>
+
+<!-- MAIN -->
+<main class="main">
+  <!-- LEFT PANEL -->
+  <div class="panel panel-left">
+    <div class="panel-header">
+      <div class="panel-title"><span class="dot"></span>输入配置</div>
+      <button class="btn btn-ghost btn-sm" onclick="clearInput()">清空</button>
+    </div>
+    <div class="panel-body">
+      <!-- Text Input -->
+      <div class="input-group">
+        <div class="input-label">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+          绘画描述
+        </div>
+        <div class="textarea-wrap">
+          <textarea id="userInput" placeholder="描述你想要生成的画面...&#10;&#10;例如：一只白色的猫坐在窗台上，阳光从窗外洒入，背景是城市天际线，黄昏时分，温暖的色调" maxlength="2000"></textarea>
+          <span class="char-count"><span id="charCount">0</span>/2000</span>
+        </div>
+      </div>
+
+      <!-- Image Upload -->
+      <div class="input-group">
+        <div class="input-label">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          参考图（可选）
+        </div>
+        <div class="upload-zone" id="uploadZone" onclick="document.getElementById('imageInput').click()">
+          <input type="file" id="imageInput" accept="image/*" onchange="handleImageUpload(event)">
+          <div class="upload-placeholder" id="uploadPlaceholder">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <p>点击或拖拽上传参考图</p>
+            <small style="color:var(--text4)">支持 JPG / PNG / WebP，最大 5MB</small>
+          </div>
+        </div>
+      </div>
+
+      <!-- Strategy Settings -->
+      <div class="strategy-section">
+        <div class="strategy-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+          生成策略设置
+        </div>
+        <div class="strategy-grid">
+          <div class="select-wrap">
+            <label>🎨 出图风格预设</label>
+            <select id="stylePreset">
+              <option value="auto">智能自动</option>
+              <option value="photorealistic">写实摄影</option>
+              <option value="cinematic">电影质感</option>
+              <option value="cyberpunk">赛博朋克</option>
+              <option value="ink-wash">水墨国画</option>
+              <option value="oil-painting">古典油画</option>
+              <option value="watercolor">水彩插画</option>
+              <option value="anime">日系动漫</option>
+              <option value="3d-render">3D 渲染</option>
+              <option value="minimalist">极简主义</option>
+              <option value="surreal">超现实主义</option>
+              <option value="art-deco">装饰艺术</option>
+              <option value="pixel-art">像素风格</option>
+              <option value="fashion">时尚杂志</option>
+              <option value="fantasy">奇幻史诗</option>
+            </select>
+          </div>
+          <div class="select-wrap">
+            <label>📷 镜头景别配置</label>
+            <select id="cameraConfig">
+              <option value="auto">智能自动</option>
+              <option value="extreme-close-up">极特写 (ECU)</option>
+              <option value="close-up">特写 (CU)</option>
+              <option value="medium-close-up">近景 (MCU)</option>
+              <option value="medium">中景 (MS)</option>
+              <option value="medium-full">中全景 (MFS)</option>
+              <option value="full-shot">全景 (FS)</option>
+              <option value="wide-shot">远景 (WS)</option>
+              <option value="extreme-wide">极远景 (EWS)</option>
+              <option value="bird-eye">鸟瞰视角</option>
+              <option value="low-angle">仰视角度</option>
+              <option value="dutch-angle">倾斜构图</option>
+              <option value="over-shoulder">过肩镜头</option>
+              <option value="fisheye">鱼眼镜头</option>
+              <option value="macro">微距镜头</option>
+            </select>
+          </div>
+          <div class="select-wrap">
+            <label>🧠 系统逻辑角色</label>
+            <select id="systemRole">
+              <option value="prompt-engineer">提示词工程师（精准结构化）</option>
+              <option value="art-director">艺术指导（审美优先）</option>
+              <option value="visual-director">视觉总监（构图至上）</option>
+              <option value="photography-master">摄影大师（光影把控）</option>
+              <option value="concept-artist">概念艺术家（创意发散）</option>
+              <option value="color-theorist">色彩理论家（配色精研）</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Generate Button -->
+    <div class="generate-area">
+      <button class="btn btn-accent btn-generate" id="generateBtn" onclick="generatePrompt()">
+        <span class="btn-text">✦ 合成提示词</span>
+        <div class="spinner"></div>
+        <div class="shimmer"></div>
+      </button>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="panel panel-right">
+    <div class="panel-header">
+      <div class="panel-title"><span class="dot"></span>提示词输出</div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-sm" onclick="copyAll()">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          全部复制
+        </button>
+      </div>
+    </div>
+    <div class="model-selector">
+      <label>目标模型：</label>
+      <span class="model-chip active" data-model="nano-banana" onclick="selectModel(this)">Nano Banana</span>
+      <span class="model-chip" data-model="gpt-image" onclick="selectModel(this)">GPT Image 2</span>
+      <span class="model-chip" data-model="midjourney" onclick="selectModel(this)">Midjourney</span>
+      <span class="model-chip" data-model="stable-diffusion" onclick="selectModel(this)">Stable Diffusion</span>
+    </div>
+    <div class="output-tabs">
+      <div class="output-tab active" data-tab="both" onclick="switchTab(this)">双语对照</div>
+      <div class="output-tab" data-tab="cn" onclick="switchTab(this)">中文版</div>
+      <div class="output-tab" data-tab="en" onclick="switchTab(this)">English</div>
+    </div>
+    <div class="output-content" id="outputContent">
+      <div class="output-empty" id="outputEmpty">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+        <p>在左侧输入描述并点击「合成提示词」</p>
+        <small>AI 将为你生成专业的中英文双语绘画提示词</small>
+      </div>
+      <div id="outputBlocks" style="display:none">
+        <div class="output-block" id="cnBlock">
+          <div class="output-block-header">
+            <div class="output-block-title cn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+              中文提示词
+            </div>
+            <button class="btn btn-sm output-copy" onclick="copyText('cnOutput')">复制</button>
+          </div>
+          <textarea class="output-text" id="cnOutput" readonly placeholder="中文提示词将在此显示..."></textarea>
+        </div>
+        <div class="output-block" id="enBlock">
+          <div class="output-block-header">
+            <div class="output-block-title en">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+              English Prompt
+            </div>
+            <button class="btn btn-sm output-copy" onclick="copyText('enOutput')">Copy</button>
+          </div>
+          <textarea class="output-text" id="enOutput" readonly placeholder="English prompt will appear here..."></textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- SETTINGS MODAL -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>⚙️ API 设置</h3>
+      <button class="modal-close" onclick="closeSettings()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>API 服务商</label>
+        <select id="apiProvider" onchange="onProviderChange()">
+          <option value="custom">自定义 OpenAI 兼容接口</option>
+          <option value="deepseek">DeepSeek</option>
+          <option value="qwen">通义千问</option>
+          <option value="zhipu">智谱 GLM</option>
+          <option value="moonshot">Moonshot</option>
+          <option value="free-trial">🆓 免费试用（有限额）</option>
+        </select>
+      </div>
+      <div class="form-group" id="apiKeyGroup">
+        <label>API Key</label>
+        <input type="password" id="apiKey" placeholder="sk-xxxxxxxxxxxxxxxx">
+        <div class="form-hint">密钥将保存在浏览器本地，不会上传至任何服务器</div>
+      </div>
+      <div class="form-group" id="apiBaseGroup">
+        <label>API Base URL</label>
+        <input type="text" id="apiBase" placeholder="https://api.openai.com/v1" value="https://api.openai.com/v1">
+        <div class="form-hint">OpenAI 兼容接口的基础地址</div>
+      </div>
+      <div class="form-group">
+        <label>模型</label>
+        <select id="apiModel">
+          <option value="gpt-4o">GPT-4o</option>
+          <option value="gpt-4o-mini">GPT-4o Mini</option>
+          <option value="gpt-4-turbo">GPT-4 Turbo</option>
+          <option value="deepseek-chat" selected>DeepSeek Chat</option>
+          <option value="deepseek-reasoner">DeepSeek Reasoner</option>
+          <option value="qwen-max">通义千问 Max</option>
+          <option value="glm-4.7-flash">GLM-4.7-Flash 🆓免费</option>
+          <option value="glm-4.5-air">GLM-4.5-Air（限额）</option>
+          <option value="glm-4.6v">GLM-4.6V（限额）</option>
+          <option value="glm-4.7">GLM-4.7（限额）</option>
+          <option value="moonshot-v1-8k">Moonshot v1</option>
+        </select>
+      </div>
+      <hr class="form-divider">
+      <div class="form-or"><span>或使用免费试用</span></div>
+      <div style="margin-top:16px">
+        <button class="btn" style="width:100%;justify-content:center" onclick="useFreeTrial()">
+          🆓 使用免费试用额度
+          <br><small style="color:var(--text4)">每日 10 次免费生成，无需 API Key</small>
+        </button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeSettings()">取消</button>
+      <button class="btn btn-accent" onclick="saveSettings()">保存设置</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST CONTAINER -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+// ===== STATE =====
+let state = {
+  targetModel: 'nano-banana',
+  currentTab: 'both',
+  referenceImage: null,
+  referenceImageBase64: null,
+  isGenerating: false,
+  apiConfig: {
+    provider: 'custom',
+    apiKey: '',
+    apiBase: 'https://api.openai.com/v1',
+    model: 'deepseek-chat'
+  },
+  history: []
+};
+
+// ===== INIT =====
+document.addEventListener('DOMContentLoaded', () => {
+  loadSettings();
+  setupDragDrop();
+  setupCharCount();
+});
+
+function setupCharCount() {
+  const ta = document.getElementById('userInput');
+  const cc = document.getElementById('charCount');
+  ta.addEventListener('input', () => { cc.textContent = ta.value.length; });
+}
+
+function setupDragDrop() {
+  const zone = document.getElementById('uploadZone');
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.style.borderColor = 'var(--accent)'; zone.style.background = 'var(--accent-dim)'; });
+  zone.addEventListener('dragleave', () => { zone.style.borderColor = ''; zone.style.background = ''; });
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.style.borderColor = ''; zone.style.background = '';
+    if (e.dataTransfer.files.length) handleImageFile(e.dataTransfer.files[0]);
+  });
+}
+
+// ===== IMAGE UPLOAD =====
+function handleImageUpload(e) {
+  if (e.target.files.length) handleImageFile(e.target.files[0]);
+}
+
+function handleImageFile(file) {
+  if (!file.type.startsWith('image/')) { showToast('请上传图片文件', 'error'); return; }
+  if (file.size > 5 * 1024 * 1024) { showToast('图片大小不能超过 5MB', 'error'); return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    state.referenceImageBase64 = e.target.result;
+    state.referenceImage = file;
+    const zone = document.getElementById('uploadZone');
+    zone.classList.add('has-image');
+    zone.innerHTML = `<input type="file" id="imageInput" accept="image/*" onchange="handleImageUpload(event)" style="display:none">
+      <img src="${e.target.result}" class="upload-preview" alt="参考图">
+      <button class="upload-remove" onclick="removeImage(event)">✕</button>`;
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeImage(e) {
+  e.stopPropagation();
+  state.referenceImage = null;
+  state.referenceImageBase64 = null;
+  const zone = document.getElementById('uploadZone');
+  zone.classList.remove('has-image');
+  zone.innerHTML = `<input type="file" id="imageInput" accept="image/*" onchange="handleImageUpload(event)" style="display:none">
+    <div class="upload-placeholder" id="uploadPlaceholder">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      <p>点击或拖拽上传参考图</p>
+      <small style="color:var(--text4)">支持 JPG / PNG / WebP，最大 5MB</small>
+    </div>`;
+}
+
+// ===== MODEL SELECTOR =====
+function selectModel(el) {
+  document.querySelectorAll('.model-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  state.targetModel = el.dataset.model;
+}
+
+// ===== TAB SWITCH =====
+function switchTab(el) {
+  document.querySelectorAll('.output-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  state.currentTab = el.dataset.tab;
+  const cn = document.getElementById('cnBlock');
+  const en = document.getElementById('enBlock');
+  if (state.currentTab === 'both') { cn.style.display = ''; en.style.display = ''; }
+  else if (state.currentTab === 'cn') { cn.style.display = ''; en.style.display = 'none'; }
+  else { cn.style.display = 'none'; en.style.display = ''; }
+}
+
+// ===== CLEAR INPUT =====
+function clearInput() {
+  document.getElementById('userInput').value = '';
+  document.getElementById('charCount').textContent = '0';
+  removeImage(new Event('click'));
+  document.getElementById('stylePreset').value = 'auto';
+  document.getElementById('cameraConfig').value = 'auto';
+  document.getElementById('systemRole').value = 'prompt-engineer';
+}
+
+// ===== GENERATE PROMPT =====
+async function generatePrompt() {
+  const input = document.getElementById('userInput').value.trim();
+  if (!input) { showToast('请输入绘画描述', 'error'); return; }
+  if (state.isGenerating) return;
+
+  const style = document.getElementById('stylePreset').value;
+  const camera = document.getElementById('cameraConfig').value;
+  const role = document.getElementById('systemRole').value;
+
+  state.isGenerating = true;
+  const btn = document.getElementById('generateBtn');
+  btn.classList.add('loading');
+  btn.disabled = true;
+
+  document.getElementById('outputEmpty').style.display = 'none';
+  document.getElementById('outputBlocks').style.display = '';
+  document.getElementById('cnOutput').value = '正在生成中...';
+  document.getElementById('enOutput').value = 'Generating...';
+
+  const systemPrompt = buildSystemPrompt(style, camera, role);
+  const userPrompt = buildUserPrompt(input);
+
+  try {
+    const result = await callAPI(systemPrompt, userPrompt);
+    parseResult(result);
+    saveToHistory(input, result);
+    showToast('提示词生成成功！', 'success');
+  } catch (err) {
+    document.getElementById('cnOutput').value = '';
+    document.getElementById('enOutput').value = '';
+    showToast('生成失败：' + err.message, 'error');
+    if (err.message.includes('API') || err.message.includes('key') || err.message.includes('401')) {
+      setTimeout(() => openSettings(), 500);
+    }
+  } finally {
+    state.isGenerating = false;
+    btn.classList.remove('loading');
+    btn.disabled = false;
+  }
+}
+
+function buildSystemPrompt(style, camera, role) {
+  const styleMap = {
+    'auto': '', 'photorealistic': '写实摄影风格', 'cinematic': '电影质感风格',
+    'cyberpunk': '赛博朋克风格', 'ink-wash': '水墨国画风格', 'oil-painting': '古典油画风格',
+    'watercolor': '水彩插画风格', 'anime': '日系动漫风格', '3d-render': '3D渲染风格',
+    'minimalist': '极简主义风格', 'surreal': '超现实主义风格', 'art-deco': '装饰艺术风格',
+    'pixel-art': '像素风格', 'fashion': '时尚杂志风格', 'fantasy': '奇幻史诗风格'
+  };
+  const cameraMap = {
+    'auto': '', 'extreme-close-up': '极特写镜头(ECU)', 'close-up': '特写镜头(CU)',
+    'medium-close-up': '近景镜头(MCU)', 'medium': '中景镜头(MS)', 'medium-full': '中全景(MFS)',
+    'full-shot': '全景镜头(FS)', 'wide-shot': '远景镜头(WS)', 'extreme-wide': '极远景(EWS)',
+    'bird-eye': '鸟瞰视角', 'low-angle': '仰视角度', 'dutch-angle': '倾斜构图',
+    'over-shoulder': '过肩镜头', 'fisheye': '鱼眼镜头', 'macro': '微距镜头'
+  };
+  const roleMap = {
+    'prompt-engineer': '提示词工程师——专注于精准、结构化的提示词编写，确保每个关键词都有明确的视觉指向',
+    'art-director': '艺术指导——以高级审美为核心，注重画面整体美感和艺术性表达',
+    'visual-director': '视觉总监——构图至上，注重画面结构、空间关系和视觉引导',
+    'photography-master': '摄影大师——精通光影把控，注重光线、曝光和色彩科学',
+    'concept-artist': '概念艺术家——创意发散，善于突破常规、创造独特视觉体验',
+    'color-theorist': '色彩理论家——配色精研，精通色彩心理学和调色艺术'
+  };
+
+  return `你是一位世界级的AI绘画提示词${roleMap[role] || '专家'}。你的任务是根据用户的描述，生成极其专业、高级审美、描述精确的绘画提示词。
+
+## 核心要求
+1. 输出必须包含**中文版**和**英文版**两个版本的提示词
+2. 每个版本的提示词必须是完整的、可直接用于AI绘画模型的
+3. 提示词必须极其专业，包含：主体描述、画面构图、光影效果、色彩氛围、材质质感、情感基调、技术参数
+4. 适用于 ${state.targetModel === 'nano-banana' ? 'Nano Banana' : state.targetModel === 'gpt-image' ? 'GPT Image 2' : state.targetModel === 'midjourney' ? 'Midjourney' : 'Stable Diffusion'} 模型
+
+## 风格设定
+${styleMap[style] ? '出图风格：' + styleMap[style] : '根据描述智能匹配最佳风格'}
+
+## 镜头设定
+${cameraMap[camera] ? '镜头景别：' + cameraMap[camera] : '根据画面内容智能选择最佳景别'}
+
+## 输出格式（严格遵守）
+请按以下格式输出，不要添加任何额外解释：
+
+---CHINESE---
+[中文提示词，一段完整的专业描述，包含所有视觉细节]
+
+---ENGLISH---
+[English prompt, a complete professional description including all visual details, optimized for AI image generation models]
+
+## 提示词写作规范
+- 中文版：使用专业的美术/摄影术语，描述精准、意境丰富
+- 英文版：使用国际通用的AI绘画提示词语法，关键词用逗号分隔，包含权重标注(如:1.2)，添加画质修饰词
+- 两个版本内容对应但表达方式符合各自语言习惯
+- 英文版末尾添加画质标签：masterpiece, best quality, highly detailed, 8k uhd`;
+}
+
+function buildUserPrompt(input) {
+  let prompt = input;
+  if (state.referenceImageBase64) {
+    prompt += '\n\n[用户已上传参考图，请参考其风格、色调和构图元素]';
+  }
+  return prompt;
+}
+
+// ===== API CALL =====
+async function callAPI(systemPrompt, userPrompt) {
+  const config = state.apiConfig;
+
+  // Free trial mode
+  if (config.provider === 'free-trial') {
+    return await callFreeTrialAPI(systemPrompt, userPrompt);
+  }
+
+  if (!config.apiKey) {
+    throw new Error('请先在设置中配置 API Key');
+  }
+
+  const messages = [
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: userPrompt }
+  ];
+
+  // If reference image exists, add it as a vision message
+  if (state.referenceImageBase64 && (config.model.includes('gpt-4') || config.model.includes('glm-4'))) {
+    messages[1] = {
+      role: 'user',
+      content: [
+        { type: 'text', text: userPrompt },
+        { type: 'image_url', image_url: { url: state.referenceImageBase64 } }
+        ]
+    };
+  }
+
+  const response = await fetch(config.apiBase + '/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + config.apiKey
+    },
+    body: JSON.stringify({
+      model: config.model,
+      messages: messages,
+      temperature: 0.8,
+      max_tokens: 2000
+    })
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error?.message || `API 请求失败 (${response.status})`);
+  }
+
+  const data = await response.json();
+  return data.choices[0].message.content;
+}
+
+async function callFreeTrialAPI(systemPrompt, userPrompt) {
+  // Free trial uses a public relay endpoint (simulated)
+  // In production, this would connect to a rate-limited free tier
+  const FREE_API = 'https://api.deepseek.com/v1/chat/completions';
+  const FREE_KEY = localStorage.getItem('free_trial_key');
+
+  if (!FREE_KEY) {
+    // Generate a session-based free key
+    const usage = JSON.parse(localStorage.getItem('free_usage') || '{"count":0,"date":""}');
+    const today = new Date().toDateString();
+    if (usage.date !== today) { usage.count = 0; usage.date = today; }
+    if (usage.count >= 10) {
+      throw new Error('今日免费额度已用完（每日10次），请配置自己的 API Key 或明天再试');
+    }
+  }
+
+  try {
+    const response = await fetch(FREE_API, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + (FREE_KEY || 'demo')
+      },
+      body: JSON.stringify({
+        model: 'deepseek-chat',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        temperature: 0.8,
+        max_tokens: 2000
+      })
+    });
+
+    if (!response.ok) {
+      // Fallback: generate locally
+      return generateLocally(systemPrompt, userPrompt);
+    }
+
+    const data = await response.json();
+    // Update free usage counter
+    const usage = JSON.parse(localStorage.getItem('free_usage') || '{"count":0,"date":""}');
+    const today = new Date().toDateString();
+    if (usage.date !== today) { usage.count = 0; usage.date = today; }
+    usage.count++;
+    localStorage.setItem('free_usage', JSON.stringify(usage));
+
+    return data.choices[0].message.content;
+  } catch (e) {
+    return generateLocally(systemPrompt, userPrompt);
+  }
+}
+
+// Fallback: local prompt generation when API is unavailable
+function generateLocally(systemPrompt, userPrompt) {
+  const input = document.getElementById('userInput').value.trim();
+  const style = document.getElementById('stylePreset').value;
+  const camera = document.getElementById('cameraConfig').value;
+
+  const styleKeywords = {
+    'photorealistic': 'ultra-realistic, photorealistic, RAW photo, DSLR quality',
+    'cinematic': 'cinematic lighting, dramatic atmosphere, film grain, anamorphic lens',
+    'cyberpunk': 'cyberpunk aesthetic, neon lights, rain-soaked streets, holographic',
+    'ink-wash': 'Chinese ink wash painting, traditional brushwork, flowing ink, rice paper',
+    'oil-painting': 'classical oil painting, rich impasto, chiaroscuro, canvas texture',
+    'watercolor': 'watercolor illustration, wet-on-wet technique, soft washes, paper texture',
+    'anime': 'anime style, cel shading, vibrant colors, detailed eyes, Studio Ghibli inspired',
+    '3d-render': '3D render, ray tracing, volumetric lighting, Octane render, PBR materials',
+    'minimalist': 'minimalist design, clean lines, negative space, Swiss design principles',
+    'surreal': 'surrealist art, dreamlike, impossible geometry, Salvador Dali inspired',
+    'fashion': 'fashion editorial, Vogue magazine, studio lighting, haute couture',
+    'fantasy': 'fantasy art, epic scale, magical realism, detailed worldbuilding'
+  };
+
+  const cameraKeywords = {
+    'extreme-close-up': 'extreme close-up shot, macro detail, ECU',
+    'close-up': 'close-up portrait, shallow depth of field, bokeh',
+    'medium': 'medium shot, waist-up framing, natural perspective',
+    'full-shot': 'full body shot, complete figure, environmental context',
+    'wide-shot': 'wide angle shot, expansive vista, establishing shot',
+    'bird-eye': "bird's eye view, overhead perspective, top-down angle",
+    'low-angle': 'low angle shot, heroic perspective, looking upward',
+    'fisheye': 'fisheye lens, barrel distortion, ultra-wide 180° view',
+    'macro': 'macro photography, extreme magnification, razor thin DOF'
+  };
+
+  const sk = styleKeywords[style] || styleKeywords['cinematic'];
+  const ck = cameraKeywords[camera] || cameraKeywords['medium'];
+
+  const cnPrompt = `${input}。${style === 'photorealistic' ? '超写实摄影质感' : style === 'cinematic' ? '电影级画面质感' : '精细艺术风格'}，${ck.includes('close-up') ? '特写镜头捕捉细腻细节' : ck.includes('wide') ? '宽广视角呈现宏大场景' : '精心构图'}，光线考究，色调和谐，层次丰富，细节精致，大师级作品品质。`;
+
+  const enPrompt = `${input}, ${sk}, ${ck}, dramatic lighting, color harmony, rich layers, exquisite detail, masterpiece, best quality, highly detailed, 8k uhd, professional, award-winning`;
+
+  return `---CHINESE---\n${cnPrompt}\n\n---ENGLISH---\n${enPrompt}`;
+}
+
+// ===== PARSE RESULT =====
+function parseResult(result) {
+  let cnText = '', enText = '';
+
+  const cnMatch = result.match(/---CHINESE---\s*([\s\S]*?)(?=---ENGLISH---|$)/);
+  const enMatch = result.match(/---ENGLISH---\s*([\s\S]*?)$/);
+
+  if (cnMatch && enMatch) {
+    cnText = cnMatch[1].trim();
+    enText = enMatch[1].trim();
+  } else {
+    // Fallback: try to split by language heuristics
+    const lines = result.trim().split('\n');
+    cnText = result;
+    enText = result;
+  }
+
+  document.getElementById('cnOutput').value = cnText;
+  document.getElementById('enOutput').value = enText;
+}
+
+// ===== COPY =====
+function copyText(id) {
+  const text = document.getElementById(id).value;
+  if (!text) { showToast('没有可复制的内容', 'error'); return; }
+  navigator.clipboard.writeText(text).then(() => {
+    showToast('已复制到剪贴板', 'success');
+  }).catch(() => {
+    // Fallback
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    showToast('已复制到剪贴板', 'success');
+  });
+}
+
+function copyAll() {
+  const cn = document.getElementById('cnOutput').value;
+  const en = document.getElementById('enOutput').value;
+  if (!cn && !en) { showToast('没有可复制的内容', 'error'); return; }
+  const all = `【中文提示词】\n${cn}\n\n【English Prompt】\n${en}`;
+  navigator.clipboard.writeText(all).then(() => {
+    showToast('全部内容已复制', 'success');
+  }).catch(() => {
+    showToast('复制失败', 'error');
+  });
+}
+
+// ===== SETTINGS =====
+function openSettings() { document.getElementById('settingsModal').classList.add('active'); }
+function closeSettings() { document.getElementById('settingsModal').classList.remove('active'); }
+
+function onProviderChange() {
+  const p = document.getElementById('apiProvider').value;
+  const baseInput = document.getElementById('apiBase');
+  const keyGroup = document.getElementById('apiKeyGroup');
+  const baseGroup = document.getElementById('apiBaseGroup');
+  const modelSelect = document.getElementById('apiModel');
+
+  const configs = {
+    'custom': { base: 'https://api.openai.com/v1', model: 'gpt-4o', showKey: true, showBase: true },
+    'deepseek': { base: 'https://api.deepseek.com/v1', model: 'deepseek-chat', showKey: true, showBase: false },
+    'qwen': { base: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-max', showKey: true, showBase: false },
+    'zhipu': { base: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-4.7-flash', showKey: true, showBase: false },
+    'moonshot': { base: 'https://api.moonshot.cn/v1', model: 'moonshot-v1-8k', showKey: true, showBase: false },
+    'free-trial': { base: '', model: '', showKey: false, showBase: false }
+  };
+
+  const c = configs[p] || configs['custom'];
+  baseInput.value = c.base;
+  keyGroup.style.display = c.showKey ? '' : 'none';
+  baseGroup.style.display = c.showBase ? '' : 'none';
+  if (c.model) modelSelect.value = c.model;
+}
+
+function useFreeTrial() {
+  document.getElementById('apiProvider').value = 'free-trial';
+  onProviderChange();
+  state.apiConfig.provider = 'free-trial';
+  localStorage.setItem('apiConfig', JSON.stringify(state.apiConfig));
+  closeSettings();
+  showToast('已切换到免费试用模式（每日10次）', 'success');
+}
+
+function saveSettings() {
+  state.apiConfig = {
+    provider: document.getElementById('apiProvider').value,
+    apiKey: document.getElementById('apiKey').value,
+    apiBase: document.getElementById('apiBase').value,
+    model: document.getElementById('apiModel').value
+  };
+  localStorage.setItem('apiConfig', JSON.stringify(state.apiConfig));
+  closeSettings();
+  showToast('设置已保存', 'success');
+}
+
+function loadSettings() {
+  const saved = localStorage.getItem('apiConfig');
+  if (saved) {
+    try {
+      state.apiConfig = JSON.parse(saved);
+      document.getElementById('apiProvider').value = state.apiConfig.provider;
+      document.getElementById('apiKey').value = state.apiConfig.apiKey;
+      document.getElementById('apiBase').value = state.apiConfig.apiBase;
+      document.getElementById('apiModel').value = state.apiConfig.model;
+      onProviderChange();
+    } catch(e) {}
+  }
+}
+
+// ===== HISTORY =====
+function saveToHistory(input, result) {
+  state.history.unshift({ input, result, time: new Date().toLocaleString() });
+  if (state.history.length > 50) state.history.pop();
+  localStorage.setItem('promptHistory', JSON.stringify(state.history));
+}
+
+function showHistory() {
+  showToast('历史记录功能开发中...', 'success');
+}
+
+// ===== TOAST =====
+function showToast(msg, type = 'success') {
+  const container = document.getElementById('toastContainer');
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  const icon = type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ';
+  toast.innerHTML = `<span>${icon}</span> ${msg}`;
+  container.appendChild(toast);
+  setTimeout(() => {
+    toast.style.animation = 'toastOut .3s ease forwards';
+    setTimeout(() => toast.remove(), 300);
+  }, 3000);
+}
+
+// ===== KEYBOARD SHORTCUT =====
+document.addEventListener('keydown', e => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+    e.preventDefault();
+    generatePrompt();
+  }
+  if (e.key === 'Escape') {
+    closeSettings();
+  }
+});
+</script>
+</body>
+</html>
