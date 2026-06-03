@@ -1,0 +1,3042 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PromptArchitect - AI 绘画提示词架构师</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0a0a0a;--surface:#0d0d0d;--surface2:#111;--surface3:#161616;
+  --border:#1a3a1a;--border-focus:#00ff41;
+  --accent:#00ff41;--accent2:#33ff66;--accent-dim:rgba(0,255,65,.08);
+  --text:#c0c0c0;--text2:#808080;--text3:#4a6a4a;--text4:#2a3a2a;
+  --danger:#ff3333;--warning:#ffaa00;--success:#00ff41;
+  --radius:0px;--radius-sm:0px;--radius-lg:0px;
+  --font:'JetBrains Mono','SFMono-Regular',monospace;
+  --mono:'JetBrains Mono','SFMono-Regular',monospace;
+  --shadow:0 0 10px rgba(0,255,65,.1);
+  --shadow-lg:0 0 30px rgba(0,255,65,.15);
+}
+html{font-size:16px;scroll-behavior:smooth}
+body{font-family:var(--font);background:var(--bg);color:var(--text);line-height:1.6;min-height:100vh;overflow-x:hidden;position:relative}
+/* CRT 扫描线 */
+body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
+  background:repeating-linear-gradient(0deg,transparent,transparent 1px,rgba(0,0,0,.15) 1px,rgba(0,0,0,.15) 2px);
+  opacity:.4}
+/* CRT 屏幕光晕 */
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:9998;
+  background:radial-gradient(ellipse at center,transparent 60%,rgba(0,0,0,.45) 100%)}
+::selection{background:var(--accent);color:var(--bg)}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:var(--surface)}
+::-webkit-scrollbar-thumb{background:#1a3a1a;border-radius:0}
+::-webkit-scrollbar-thumb:hover{background:var(--accent)}
+
+/* ===== HEADER ===== */
+.header{position:sticky;top:0;z-index:100;background:var(--bg);border-bottom:1px solid var(--accent);padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 0 15px rgba(0,255,65,.08)}
+.logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:18px;letter-spacing:-.5px}
+.logo-icon{width:32px;height:32px;background:transparent;border:1px solid var(--accent);display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--accent);font-weight:800;box-shadow:0 0 10px rgba(0,255,65,.2)}
+.logo span{color:var(--accent);text-shadow:0 0 8px rgba(0,255,65,.4)}
+@keyframes blink-cursor{0%,100%{opacity:1}50%{opacity:0}}
+.header-actions{display:flex;align-items:center;gap:12px}
+.mode-switcher{display:flex;gap:0;background:var(--surface);border:1px solid var(--border);overflow:hidden;margin-left:16px}
+.mode-btn{display:flex;align-items:center;gap:6px;padding:6px 14px;font-size:13px;font-weight:500;cursor:pointer;border:none;background:transparent;color:var(--text3);transition:all .2s;font-family:var(--font);border-right:1px solid var(--border)}
+.mode-btn:last-child{border-right:none}
+.mode-btn:hover{color:var(--accent);background:rgba(0,255,65,.05)}
+.mode-btn.active{background:rgba(0,255,65,.12);color:var(--accent);font-weight:600;text-shadow:0 0 6px rgba(0,255,65,.3)}
+.segmented-toggle{display:flex;align-items:center;gap:8px;margin-top:4px}
+.segmented-toggle label{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px}
+.toggle-switch{position:relative;width:36px;height:20px;background:var(--surface2);border:1px solid var(--border);border-radius:0;cursor:pointer;transition:all .2s;flex-shrink:0}
+.toggle-switch.active{background:rgba(0,255,65,.12);border-color:var(--accent)}
+.toggle-switch::after{content:'';position:absolute;top:2px;left:2px;width:14px;height:14px;background:var(--text3);border-radius:0;transition:all .2s}
+.toggle-switch.active::after{left:18px;background:var(--accent);box-shadow:0 0 6px rgba(0,255,65,.4)}
+
+/* ===== BUTTONS ===== */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:0;font-family:var(--font);font-size:13px;font-weight:500;cursor:pointer;transition:all .2s;border:1px solid var(--border);background:transparent;color:var(--text)}
+.btn:hover{background:rgba(0,255,65,.08);border-color:var(--accent);color:var(--accent)}
+.btn-accent{background:var(--accent);color:var(--bg);border-color:var(--accent);font-weight:600;text-shadow:none}
+.btn-accent:hover{background:var(--accent2);border-color:var(--accent2);color:var(--bg);box-shadow:0 0 20px rgba(0,255,65,.3)}
+.btn-accent:disabled{opacity:.5;cursor:not-allowed;box-shadow:none}
+.btn-ghost{border-color:transparent;color:var(--text2)}
+.btn-ghost:hover{color:var(--text);background:rgba(0,255,65,.05)}
+.btn-sm{padding:5px 10px;font-size:12px}
+.btn-icon{width:32px;height:32px;padding:0;display:flex;align-items:center;justify-content:center;border-radius:0}
+
+/* Progress Indicator */
+.progress-container{position:relative}
+.progress-bar{width:100%;height:3px;background:var(--surface2);border-radius:0;overflow:hidden}
+.progress-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .3s ease}
+.progress-text{font-size:11px;color:var(--text3);text-align:center;font-family:var(--mono)}
+
+/* ===== MAIN LAYOUT ===== */
+.main{display:flex;height:calc(100vh - 56px);overflow:hidden}
+.panel{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.panel-left{border-right:1px solid var(--border);max-width:520px;min-width:400px}
+.panel-right{flex:1}
+.panel-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.panel-title{font-size:14px;font-weight:600;letter-spacing:.3px;display:flex;align-items:center;gap:8px;color:var(--accent);text-shadow:0 0 4px rgba(0,255,65,.2)}
+.panel-title .dot{width:8px;height:8px;border-radius:0;background:var(--accent);box-shadow:0 0 8px rgba(0,255,65,.5)}
+.panel-body{flex:1;overflow-y:auto;padding:20px}
+
+/* ===== INPUT AREA ===== */
+.input-group{margin-bottom:20px}
+.input-label{font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.textarea-wrap{position:relative}
+.textarea-wrap textarea{width:100%;min-height:140px;padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:0;color:var(--text);font-family:var(--font);font-size:14px;line-height:1.6;resize:vertical;transition:border-color .2s;caret-color:var(--accent)}
+.textarea-wrap textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 1px var(--accent),0 0 10px rgba(0,255,65,.1)}
+.textarea-wrap textarea::placeholder{color:var(--text4)}
+.char-count{position:absolute;bottom:8px;right:12px;font-size:11px;color:var(--text4);font-family:var(--mono)}
+
+/* ===== IMAGE UPLOAD ===== */
+.upload-zone{border:1px dashed var(--border);border-radius:0;padding:24px;text-align:center;cursor:pointer;transition:all .2s;position:relative;overflow:hidden}
+.upload-zone:hover{border-color:var(--accent);background:rgba(0,255,65,.05)}
+.upload-zone.has-image{border-style:solid;border-color:var(--accent);padding:0}
+.upload-zone input[type=file]{display:none}
+.upload-placeholder{color:var(--text3);font-size:13px}
+.upload-placeholder svg{margin-bottom:8px;opacity:.5}
+.upload-placeholder p{margin-top:4px}
+.upload-preview{width:100%;max-height:240px;object-fit:contain;display:block;border-radius:0}
+.upload-remove{position:absolute;top:8px;right:8px;width:28px;height:28px;background:rgba(0,0,0,.8);border:1px solid var(--border);border-radius:0;color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;z-index:2;transition:all .2s}
+.upload-remove:hover{background:var(--danger);border-color:var(--danger)}
+
+/* ===== STRATEGY SETTINGS ===== */
+.strategy-section{margin-top:20px;padding-top:20px;border-top:1px solid var(--border)}
+.strategy-title{font-size:13px;font-weight:600;color:var(--accent);margin-bottom:14px;display:flex;align-items:center;gap:8px;text-shadow:0 0 4px rgba(0,255,65,.2)}
+.strategy-title svg{color:var(--accent)}
+.strategy-grid{display:grid;grid-template-columns:1fr;gap:12px}
+.select-wrap{position:relative}
+.select-wrap label{display:block;font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.select-wrap select{width:100%;padding:10px 36px 10px 12px;background:var(--surface);border:1px solid var(--border);border-radius:0;color:var(--text);font-family:var(--font);font-size:13px;cursor:pointer;appearance:none;transition:all .2s}
+.select-wrap select:hover{border-color:rgba(0,255,65,.4)}
+.select-wrap select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 1px var(--accent),0 0 10px rgba(0,255,65,.1)}
+.select-wrap::after{content:'▾';position:absolute;right:12px;bottom:11px;color:var(--accent);pointer-events:none;font-size:12px}
+.select-wrap select option{background:#0a0a0a;color:var(--text);padding:8px;border-bottom:1px solid var(--border)}
+.select-wrap select option:hover,.select-wrap select option:checked{background:rgba(0,255,65,.12);color:var(--accent)}
+
+/* ===== CUSTOM SELECT ===== */
+.custom-select{position:relative;width:100%;cursor:pointer;font-family:var(--font)}
+.custom-select-trigger{display:flex;align-items:center;min-height:38px;padding:10px 36px 10px 12px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;transition:all .2s;position:relative;user-select:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.custom-select-trigger::after{content:'▾';position:absolute;right:12px;color:var(--accent);font-size:12px;flex-shrink:0}
+.custom-select-trigger:hover{border-color:rgba(0,255,65,.4)}
+.custom-select.open .custom-select-trigger{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent),0 0 10px rgba(0,255,65,.1)}
+.custom-select-options{position:absolute;top:calc(100% + 1px);left:0;right:0;background:#0a0a0a;border:1px solid var(--accent);border-top:none;display:none;z-index:999;max-height:240px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,.5)}
+.custom-select.open .custom-select-options{display:block}
+.custom-option{padding:8px 12px;color:var(--text);font-size:13px;cursor:pointer;transition:background .15s;border-bottom:1px solid var(--border)}
+.custom-option:last-child{border-bottom:none}
+.custom-option:hover{background:rgba(0,255,65,.08);color:var(--accent)}
+.custom-option.selected{background:rgba(0,255,65,.12);color:var(--accent)}
+.custom-select.open .custom-select-trigger::after{content:'▴'}
+
+/* ===== GENERATE BUTTON ===== */
+.generate-area{padding:16px 20px;border-top:1px solid var(--border);flex-shrink:0}
+.btn-generate{width:100%;padding:14px;font-size:15px;font-weight:600;border-radius:0;letter-spacing:.3px;position:relative;overflow:hidden}
+.btn-generate .shimmer{position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(0,255,65,.2),transparent);animation:shimmer 2s infinite}
+@keyframes shimmer{100%{left:100%}}
+.btn-generate.loading .btn-text{opacity:0}
+.btn-generate .spinner{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:20px;height:20px;border:2px solid rgba(5,5,7,.3);border-top-color:var(--bg);border-radius:50%;animation:spin .8s linear infinite;display:none}
+.btn-generate.loading .spinner{display:block}
+@keyframes spin{to{transform:translate(-50%,-50%) rotate(360deg)}}
+
+/* ===== OUTPUT AREA ===== */
+.output-tabs{display:flex;gap:0;border-bottom:1px solid var(--border);padding:0 20px;flex-shrink:0}
+.output-tab{padding:12px 20px;font-size:13px;font-weight:500;color:var(--text3);cursor:pointer;border-bottom:2px solid transparent;transition:all .2s}
+.output-tab:hover{color:var(--text2)}
+.output-tab.active{color:var(--accent);border-bottom-color:var(--accent);text-shadow:0 0 6px rgba(0,255,65,.3)}
+.output-content{flex:1;overflow-y:auto;padding:20px}
+.output-block{margin-bottom:20px}
+.output-block-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.output-block-title{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;gap:6px}
+.output-block-title.cn{color:#ff6b6b;text-shadow:0 0 4px rgba(255,107,107,.3)}
+.output-block-title.en{color:#00ff41;text-shadow:0 0 4px rgba(0,255,65,.3)}
+.output-copy{padding:4px 10px;font-size:11px;font-family:var(--mono);font-weight:500;border-radius:0}
+.output-text{width:100%;min-height:160px;padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:0;color:var(--text);font-size:13px;line-height:1.7;resize:none;font-family:var(--mono);transition:border-color .2s;caret-color:var(--accent);overflow:hidden}
+.output-text:focus{outline:none;border-color:var(--accent)}
+.output-text::placeholder{color:var(--text4)}
+
+.output-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text4);text-align:center;padding:40px}
+.output-empty svg{opacity:.2;margin-bottom:16px;color:var(--accent)}
+.output-empty p{font-size:14px;margin-bottom:4px}
+.output-empty small{font-size:12px;color:var(--text4)}
+
+/* ===== TARGET MODEL SELECTOR ===== */
+.model-selector{display:flex;align-items:center;gap:8px;padding:12px 20px;border-bottom:1px solid var(--border);flex-shrink:0}
+.model-selector label{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px}
+.model-chip{padding:5px 12px;border-radius:0;font-size:12px;font-weight:500;cursor:pointer;border:1px solid var(--border);color:var(--text3);transition:all .2s}
+.model-chip:hover{border-color:var(--accent);color:var(--accent)}
+.model-chip.active{background:rgba(0,255,65,.12);border-color:var(--accent);color:var(--accent);box-shadow:0 0 8px rgba(0,255,65,.15)}
+
+/* ===== MODAL ===== */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;display:none;align-items:center;justify-content:center}
+.modal-overlay.active{display:flex}
+.modal{background:var(--surface);border:1px solid var(--accent);border-radius:0;width:480px;max-width:90vw;max-height:80vh;overflow-y:auto;box-shadow:0 0 30px rgba(0,255,65,.15)}
+.modal-header{padding:20px 24px;border-bottom:1px solid var(--accent);display:flex;align-items:center;justify-content:space-between}
+.modal-header h3{font-size:16px;font-weight:600;color:var(--accent);text-shadow:0 0 6px rgba(0,255,65,.3)}
+.modal-close{width:32px;height:32px;display:flex;align-items:center;justify-content:center;border:1px solid var(--border);background:transparent;color:var(--text3);cursor:pointer;border-radius:0;transition:all .2s}
+.modal-close:hover{background:rgba(0,255,65,.1);color:var(--accent);border-color:var(--accent)}
+.modal-body{padding:24px}
+.modal-footer{padding:16px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px}
+
+.form-group{margin-bottom:18px}
+.form-group label{display:block;font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px}
+.form-group input,.form-group select{width:100%;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:0;color:var(--text);font-family:var(--font);font-size:13px;transition:all .2s}
+.form-group input:hover,.form-group select:hover{border-color:rgba(0,255,65,.4)}
+.form-group input:focus,.form-group select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 1px var(--accent),0 0 10px rgba(0,255,65,.1)}
+.form-group select option{background:#0a0a0a;color:var(--text);padding:8px;border-bottom:1px solid var(--border)}
+.form-group select option:checked{background:rgba(0,255,65,.12);color:var(--accent)}
+.form-group input::placeholder{color:var(--text4)}
+.form-hint{font-size:11px;color:var(--text4);margin-top:4px}
+
+/* ===== API PRESETS ===== */
+.api-presets{padding:0 24px 16px;border-top:1px solid var(--border);margin-top:4px}
+.api-presets-label{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.api-presets-list{display:flex;flex-wrap:wrap;gap:8px}
+.api-preset-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;font-size:12px;font-weight:500;cursor:pointer;border:1px solid var(--border);background:var(--surface2);color:var(--text2);transition:all .2s;font-family:var(--font);position:relative}
+.api-preset-chip:hover{border-color:var(--accent);color:var(--accent);background:rgba(0,255,65,.05)}
+.api-preset-chip.active{border-color:var(--accent);color:var(--accent);background:rgba(0,255,65,.1);text-shadow:0 0 4px rgba(0,255,65,.3)}
+.api-preset-chip .preset-delete{display:none;margin-left:2px;font-size:10px;color:var(--text3);cursor:pointer;padding:0 2px}
+.api-preset-chip:hover .preset-delete{display:inline}
+.api-preset-chip .preset-delete:hover{color:var(--danger)}
+.api-presets-empty{font-size:12px;color:var(--text4);padding:4px 0}
+
+/* ===== MODEL PRESETS ===== */
+.model-presets{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.model-preset-chip{display:inline-block;padding:4px 10px;font-size:11px;font-weight:500;cursor:pointer;border:1px solid var(--border);background:var(--surface);color:var(--text2);transition:all .2s;font-family:var(--font)}
+.model-preset-chip:hover{border-color:var(--accent);color:var(--accent);background:rgba(0,255,65,.05)}
+.model-preset-chip:active{background:rgba(0,255,65,.12)}
+.form-divider{border:none;border-top:1px solid var(--border);margin:20px 0}
+.form-or{text-align:center;font-size:12px;color:var(--text4);margin:-10px 0;position:relative}
+.form-or span{background:var(--surface);padding:0 12px;position:relative;z-index:1}
+
+/* ===== HISTORY ===== */
+.history-tabs{display:flex;gap:8px;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:12px}
+.history-tab{padding:6px 14px;border-radius:0;font-size:13px;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--text3);transition:all .2s}
+.history-tab:hover{border-color:var(--accent);color:var(--text)}
+.history-tab.active{background:rgba(0,255,65,.12);border-color:var(--accent);color:var(--accent)}
+.history-list{display:flex;flex-direction:column;gap:10px}
+.history-item{padding:14px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:0;cursor:pointer;transition:all .15s;position:relative}
+.history-item:hover{border-color:var(--accent);background:rgba(0,255,65,.05)}
+.history-item-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:10px}
+.history-item-mode{padding:2px 8px;background:rgba(0,255,65,.15);color:var(--accent);font-size:11px;border-radius:0}
+.history-item-time{font-size:12px;color:var(--text3);white-space:nowrap}
+.history-item-input{font-size:13px;color:var(--text);line-height:1.5;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.history-item-preview{font-size:11px;color:var(--text3);margin-top:6px;padding-top:6px;border-top:1px solid var(--border);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ===== TOAST ===== */
+.toast-container{position:fixed;top:70px;right:20px;z-index:300;display:flex;flex-direction:column;gap:8px}
+.toast{padding:12px 18px;background:var(--surface2);border:1px solid var(--border);border-radius:0;font-size:13px;color:var(--text);box-shadow:var(--shadow);animation:toastIn .3s ease;display:flex;align-items:center;gap:8px;min-width:240px}
+.toast.success{border-color:var(--success);background:rgba(0,255,65,.08);color:var(--accent)}
+.toast.error{border-color:var(--danger);background:rgba(255,51,51,.08);color:var(--danger)}
+@keyframes toastIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
+@keyframes toastOut{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(20px)}}
+
+/* ===== RESPONSIVE ===== */
+@media(max-width:900px){
+ .main{flex-direction:column;height:auto}
+ .panel-left{max-width:100%;min-width:auto;border-right:none;border-bottom:1px solid var(--border);max-height:50vh}
+ .panel-right{min-height:50vh}
+}
+@media(max-width:600px){
+ .header{flex-direction:column;gap:8px;padding:10px;height:auto}
+ .logo{font-size:14px}
+ .logo span{font-size:14px}
+ .mode-switcher{width:100%;justify-content:center}
+ .mode-btn{padding:6px 10px;font-size:12px}
+ .header-actions{width:100%;justify-content:center;gap:8px}
+ .btn-ghost{padding:6px 10px;font-size:12px}
+ .main{gap:0}
+ .panel-left,.panel-right{max-width:100%;border:none;margin:0}
+ .panel-left{border-bottom:1px solid var(--border);max-height:45vh}
+ .panel-right{max-height:55vh}
+ .textarea-wrap textarea{min-height:100px;font-size:14px}
+ .output-text{min-height:120px;font-size:12px}
+ .strategy-grid{grid-template-columns:1fr}
+ .form-group input,.form-group select{font-size:14px;padding:10px}
+ .modal{width:95%;}
+ .modal-body{padding:16px}
+ .modal-footer{padding:12px 16px;flex-direction:column}
+ .modal-footer .btn{width:100%}
+ .history-tabs{flex-direction:column}
+ .history-tab{width:100%;text-align:center}
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="logo">
+    <div class="logo-icon">>_</div>
+    <span style="color:var(--accent)">PromptArchitect</span>
+  </div>
+  <div class="mode-switcher">
+    <button class="mode-btn active" data-btn-mode="image" onclick="switchMode('image')">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+      绘画
+    </button>
+    <button class="mode-btn" data-btn-mode="video" onclick="switchMode('video')">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+      视频
+    </button>
+  </div>
+  <div class="header-actions">
+    <button class="btn btn-ghost btn-sm" onclick="showHistory()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      历史记录
+    </button>
+    <button class="btn btn-sm" onclick="openSettings()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      API 设置
+    </button>
+  </div>
+</header>
+
+<!-- MAIN -->
+<main class="main">
+  <!-- LEFT PANEL -->
+  <div class="panel panel-left">
+    <div class="panel-header">
+      <div class="panel-title"><span class="dot"></span>输入配置</div>
+      <button class="btn btn-ghost btn-sm" onclick="clearInput()">清空</button>
+    </div>
+    <div class="panel-body">
+      <!-- Text Input -->
+      <div class="input-group">
+        <div class="input-label">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+          <span id="inputLabelText">绘画描述</span>
+        </div>
+        <div class="textarea-wrap">
+          <textarea id="userInput" placeholder="描述你想要生成的画面...&#10;&#10;例如:一只白色的猫坐在窗台上,阳光从窗外洒入,背景是城市天际线,黄昏时分,温暖的色调" maxlength="2000"></textarea>
+          <span class="char-count"><span id="charCount">0</span>/2000</span>
+        </div>
+      </div>
+
+      <!-- Image Upload -->
+      <div class="input-group">
+        <div class="input-label">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          <span id="uploadLabelText">参考图(可选)</span>
+        </div>
+        <div class="upload-zone" id="uploadZone" onclick="document.getElementById('imageInput').click()">
+          <input type="file" id="imageInput" accept="image/*" onchange="handleImageUpload(event)">
+          <div class="upload-placeholder" id="uploadPlaceholder">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <p>点击或拖拽上传参考图</p>
+            <small style="color:var(--text4)">支持 JPG / PNG / WebP,最大 5MB</small>
+          </div>
+        </div>
+      </div>
+
+      <!-- Strategy Settings -->
+      <div class="strategy-section">
+        <div class="strategy-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+          生成策略设置
+        </div>
+        <div class="strategy-grid" data-mode="image">
+          <div class="select-wrap">
+            <label>🎨 出图风格预设</label>
+            <div class="custom-select" id="stylePreset" data-value="auto">
+              <div class="custom-select-trigger">智能自动</div>
+              <div class="custom-select-options">
+                <div class="custom-option selected" data-value="auto">智能自动</div>
+                <div class="custom-option" data-value="cinematic">胶片电影</div>
+                <div class="custom-option" data-value="tvc">TVC 广告</div>
+                <div class="custom-option" data-value="iphone">iPhone 拍摄</div>
+              </div>
+            </div>
+          </div>
+          <div class="select-wrap">
+            <label>📷 镜头景别配置</label>
+            <div class="custom-select" id="cameraConfig" data-value="auto">
+              <div class="custom-select-trigger">智能自动</div>
+              <div class="custom-select-options">
+                <div class="custom-option selected" data-value="auto">智能自动</div>
+                <div class="custom-option" data-value="extreme-close-up">极特写 (ECU)</div>
+                <div class="custom-option" data-value="close-up">特写 (CU)</div>
+                <div class="custom-option" data-value="medium-close-up">近景 (MCU)</div>
+                <div class="custom-option" data-value="medium">中景 (MS)</div>
+                <div class="custom-option" data-value="medium-full">中全景 (MFS)</div>
+                <div class="custom-option" data-value="full-shot">全景 (FS)</div>
+                <div class="custom-option" data-value="wide-shot">远景 (WS)</div>
+                <div class="custom-option" data-value="extreme-wide">极远景 (EWS)</div>
+                <div class="custom-option" data-value="bird-eye">鸟瞰视角</div>
+                <div class="custom-option" data-value="low-angle">仰视角度</div>
+                <div class="custom-option" data-value="dutch-angle">倾斜构图</div>
+                <div class="custom-option" data-value="over-shoulder">过肩镜头</div>
+                <div class="custom-option" data-value="fisheye">鱼眼镜头</div>
+                <div class="custom-option" data-value="macro">微距镜头</div>
+              </div>
+            </div>
+          </div>
+          <div class="select-wrap">
+            <label>🧠 系统逻辑角色</label>
+            <div class="custom-select" id="systemRole" data-value="prompt-engineer">
+              <div class="custom-select-trigger">提示词工程师(精准结构化)</div>
+              <div class="custom-select-options">
+                <div class="custom-option selected" data-value="prompt-engineer">提示词工程师(精准结构化)</div>
+                <div class="custom-option" data-value="art-director">艺术指导(审美优先)</div>
+                <div class="custom-option" data-value="visual-director">视觉总监(构图至上)</div>
+                <div class="custom-option" data-value="photography-master">摄影大师(光影把控)</div>
+                <div class="custom-option" data-value="concept-artist">概念艺术家(创意发散)</div>
+                <div class="custom-option" data-value="color-theorist">色彩理论家(配色精研)</div>
+              </div>
+            </div>
+          </div>
+          <div class="select-wrap">
+            <label>✨ 多风格</label>
+            <div class="segmented-toggle">
+              <div class="toggle-switch" id="altStyleToggle" onclick="toggleAltStyle()"></div>
+              <label id="altStyleLabel" style="text-transform:none;letter-spacing:0;font-size:12px">输出替代风格版本(同一画面不同视觉语言)</label>
+            </div>
+          </div>
+        </div>
+        <!-- Video Strategy Grid -->
+        <div class="strategy-grid" data-mode="video" style="display:none">
+          <div class="select-wrap">
+            <label>🎬 视频风格预设</label>
+            <div class="custom-select" id="videoStylePreset" data-value="auto">
+              <div class="custom-select-trigger">智能自动</div>
+              <div class="custom-select-options">
+                <div class="custom-option selected" data-value="auto">智能自动</div>
+                <div class="custom-option" data-value="cinematic">胶片电影</div>
+                <div class="custom-option" data-value="tvc">TV广告</div>
+                <div class="custom-option" data-value="iphone">iPhone 拍摄</div>
+              </div>
+            </div>
+          </div>
+          <div class="select-wrap">
+            <label>🎥 运镜方式</label>
+            <div class="custom-select" id="cameraMovement" data-value="auto">
+              <div class="custom-select-trigger">智能自动</div>
+              <div class="custom-select-options">
+                <div class="custom-option selected" data-value="auto">智能自动</div>
+                <div class="custom-option" data-value="static">固定镜头</div>
+                <div class="custom-option" data-value="pan">水平摇镜 (Pan)</div>
+                <div class="custom-option" data-value="tilt">垂直摇镜 (Tilt)</div>
+                <div class="custom-option" data-value="dolly-in">推镜头 (Dolly In)</div>
+                <div class="custom-option" data-value="dolly-out">拉镜头 (Dolly Out)</div>
+                <div class="custom-option" data-value="tracking">跟拍 (Tracking)</div>
+                <div class="custom-option" data-value="crane">摇臂镜头 (Crane)</div>
+                <div class="custom-option" data-value="handheld">手持晃动 (Handheld)</div>
+                <div class="custom-option" data-value="steadicam">稳定器跟拍 (Steadicam)</div>
+                <div class="custom-option" data-value="drone">航拍 (Drone)</div>
+                <div class="custom-option" data-value="orbit">环绕拍摄 (Orbit)</div>
+                <div class="custom-option" data-value="whip-pan">甩镜 (Whip Pan)</div>
+                <div class="custom-option" data-value="dutch-roll">旋转倾斜 (Dutch Roll)</div>
+                <div class="custom-option" data-value="zoom">变焦 (Zoom)</div>
+              </div>
+            </div>
+          </div>
+          <div class="select-wrap">
+            <label>🧠 视频角色</label>
+            <div class="custom-select" id="videoRole" data-value="cinematographer">
+              <div class="custom-select-trigger">摄影指导(运镜与光影把控)</div>
+              <div class="custom-select-options">
+                <div class="custom-option selected" data-value="cinematographer">摄影指导(运镜与光影把控)</div>
+                <div class="custom-option" data-value="director">导演(叙事与节奏把控)</div>
+                <div class="custom-option" data-value="editor">剪辑师(转场与节奏精研)</div>
+                <div class="custom-option" data-value="vfx-supervisor">特效总监(视觉特效与合成)</div>
+                <div class="custom-option" data-value="colorist">调色师(色彩与氛围营造)</div>
+                <div class="custom-option" data-value="sound-designer">声音设计师(音画同步与氛围声场)</div>
+              </div>
+            </div>
+          </div>
+          <div class="select-wrap">
+            <label>⏱ 镜头节奏</label>
+            <div class="custom-select" id="videoPacing" data-value="auto">
+              <div class="custom-select-trigger">智能自动</div>
+              <div class="custom-select-options">
+                <div class="custom-option selected" data-value="auto">智能自动</div>
+                <div class="custom-option" data-value="slow">慢节奏(抒情/沉浸)</div>
+                <div class="custom-option" data-value="medium">中等节奏(叙事/展示)</div>
+                <div class="custom-option" data-value="fast">快节奏(动作/冲击)</div>
+                <div class="custom-option" data-value="variable">变速节奏(慢→快/快→慢)</div>
+                <div class="custom-option" data-value="rhythmic">律动节奏(节拍驱动)</div>
+              </div>
+            </div>
+          </div>
+          <div class="select-wrap">
+            <label>🎬 自动分镜</label>
+            <div class="segmented-toggle">
+              <div class="toggle-switch" id="segmentedToggle" onclick="toggleSegmented()"></div>
+              <label id="segmentedLabel" style="text-transform:none;letter-spacing:0;font-size:12px">LLM 自动判断是否需要多镜头,并分配景别/运镜/时长</label>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+ <!-- Generate Button -->
+ <div class="generate-area">
+  <button class="btn btn-accent btn-generate" id="generateBtn" onclick="generatePrompt()">
+   <span class="btn-text">✦ 合成提示词</span>
+   <div class="spinner"></div>
+   <div class="shimmer"></div>
+  </button>
+  <div id="progressBar" class="progress-container" style="display:none;margin-top:12px;">
+   <div class="progress-bar"><div class="progress-fill"></div></div>
+   <div id="progressText" class="progress-text" style="margin-top:6px;font-size:11px;color:var(--text3);text-align:center;"></div>
+  </div>
+  <button id="cancelBtn" class="btn btn-ghost btn-sm" onclick="cancelGeneration()" style="display:none;width:100%;margin-top:8px;">
+   <span style="color:var(--danger)">✕ 取消生成</span>
+  </button>
+ </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="panel panel-right">
+    <div class="panel-header">
+      <div class="panel-title"><span class="dot"></span>提示词输出</div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-sm" onclick="copyAll()">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          全部复制
+        </button>
+        <button class="btn btn-sm" id="altStyleBtn" style="display:none;color:#a78bfa;border-color:#a78bfa" onclick="generateAltStyle()">
+          ✨ 替代风格
+        </button>
+      </div>
+    </div>
+ <div class="model-selector" data-mode="image">
+ <label>目标模型:</label>
+ <span class="model-chip active" data-model="nano-banana" onclick="selectModel(this)">Nano Banana</span>
+ <span class="model-chip" data-model="gpt-image" onclick="selectModel(this)">GPT Image</span>
+ <span class="model-chip" data-model="midjourney" onclick="selectModel(this)">Midjourney</span>
+ <span class="model-chip" data-model="json" onclick="selectModel(this)">Json</span>
+ </div>
+    <div class="model-selector" data-mode="video" style="display:none">
+      <label>目标模型:</label>
+      <span class="model-chip active" data-model="kling" onclick="selectVideoModel(this)">Kling 3.0</span>
+      <span class="model-chip" data-model="seedance" onclick="selectVideoModel(this)">Seedance 2.0</span>
+    </div>
+    <div class="output-tabs">
+      <div class="output-tab active" data-tab="both" onclick="switchTab(this)">双语对照</div>
+      <div class="output-tab" data-tab="cn" onclick="switchTab(this)">中文版</div>
+      <div class="output-tab" data-tab="en" onclick="switchTab(this)">English</div>
+    </div>
+    <div class="output-content" id="outputContent">
+      <div class="output-empty" id="outputEmpty">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+        <p>在左侧输入描述并点击「合成提示词」</p>
+        <small>AI 将为你生成专业的中英文双语绘画提示词</small>
+      </div>
+      <div id="outputBlocks" style="display:none">
+        <div class="output-block" id="cnBlock">
+          <div class="output-block-header">
+            <div class="output-block-title cn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+              中文提示词
+            </div>
+            <button class="btn btn-sm output-copy" onclick="copyText('cnOutput')">复制</button>
+          </div>
+          <textarea class="output-text" id="cnOutput" readonly placeholder="中文提示词将在此显示..."></textarea>
+        </div>
+        <div class="output-block" id="enBlock">
+          <div class="output-block-header">
+            <div class="output-block-title en">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+              English Prompt
+            </div>
+            <button class="btn btn-sm output-copy" onclick="copyText('enOutput')">Copy</button>
+          </div>
+          <textarea class="output-text" id="enOutput" readonly placeholder="English prompt will appear here..."></textarea>
+        </div>
+        <div class="output-block" id="lintBlock" style="display:none">
+          <div class="output-block-header">
+            <div class="output-block-title" style="color:#f59e0b">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+              Pitfall Lint
+            </div>
+            <button class="btn btn-sm output-copy" onclick="copyText('lintOutput')">复制</button>
+          </div>
+          <textarea class="output-text" id="lintOutput" readonly style="min-height:80px;font-size:13px;color:#f59e0b" placeholder="Lint 检查报告将在此显示..."></textarea>
+        </div>
+        <div class="output-block" id="altBlock" style="display:none">
+          <div class="output-block-header">
+            <div class="output-block-title" style="color:#a78bfa">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+              替代风格
+            </div>
+            <button class="btn btn-sm output-copy" onclick="copyAllAlt()">复制全部</button>
+          </div>
+          <textarea class="output-text" id="altCnOutput" readonly style="min-height:120px" placeholder="替代风格中文版..."></textarea>
+          <textarea class="output-text" id="altEnOutput" readonly style="min-height:120px;margin-top:8px" placeholder="Alternative style EN..."></textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- SETTINGS MODAL -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>⚙️ API 设置</h3>
+      <button class="modal-close" onclick="closeSettings()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>API 服务商</label>
+<div class="custom-select" id="apiProvider" data-value="custom">
+  <div class="custom-select-trigger">自定义OpenAI兼容接口</div>
+  <div class="custom-select-options">
+    <div class="custom-option selected" data-value="custom">自定义OpenAI兼容接口</div>
+    <div class="custom-option" data-value="deepseek">DeepSeek</div>
+    <div class="custom-option" data-value="mimo">Xiaomi MiMo</div>
+    <div class="custom-option" data-value="ling">Ling Studio</div>
+    <div class="custom-option" data-value="zhipu">GLM</div>
+    <div class="custom-option" data-value="sensenova">SenseNova</div>
+    <div class="custom-option" data-value="hunyuan">Hunyuan</div>
+  </div>
+</div>
+      </div>
+      <div class="form-group" id="apiKeyGroup">
+        <label>API Key</label>
+        <input type="password" id="apiKey" placeholder="sk-xxxxxxxxxxxxxxxx">
+        <div class="form-hint">密钥将保存在浏览器本地,不会上传至任何服务器</div>
+      </div>
+      <div class="form-group" id="apiBaseGroup">
+        <label>API Base URL</label>
+        <input type="text" id="apiBase" placeholder="https://api.openai.com/v1" value="https://api.openai.com/v1">
+        <div class="form-hint">OpenAI 兼容接口的基础地址</div>
+      </div>
+      <div class="form-group">
+        <label>模型</label>
+<input type="text" id="apiModel" placeholder="输入模型名称,如 gpt-4o、deepseek-chat" value="gpt-5.4">
+        <div class="model-presets" id="modelPresets"></div>
+ </div>
+      </div>
+    <div class="api-presets" id="apiPresetsSection">
+      <div class="api-presets-label">⚡ 已保存的接口</div>
+      <div class="api-presets-list" id="apiPresetsList">
+        <div class="api-presets-empty">保存接口后将在此生成快捷切换按钮</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeSettings()">取消</button>
+      <button class="btn btn-accent" onclick="saveSettings()">保存设置</button>
+    </div>
+    </div>
+  </div>
+</div>
+
+<!-- HISTORY MODAL -->
+<div class="modal-overlay" id="historyModal">
+  <div class="modal" style="width:600px;max-width:95vw;">
+    <div class="modal-header">
+      <h3>📜 历史记录</h3>
+      <button class="modal-close" onclick="closeHistory()">✕</button>
+    </div>
+    <div class="modal-body" style="max-height:60vh;overflow-y:auto;">
+      <div class="history-tabs">
+        <button class="history-tab active" data-tab="image">绘画记录</button>
+        <button class="history-tab" data-tab="video">视频记录</button>
+      </div>
+      <div id="historyList" class="history-list">
+        <!-- 历史记录列表将在这里渲染 -->
+      </div>
+      <div id="historyEmpty" class="history-empty" style="display:none;text-align:center;padding:40px 20px;color:var(--text3);">
+        <div style="font-size:48px;margin-bottom:16px;">📝</div>
+        <div>暂无历史记录</div>
+        <div style="font-size:12px;margin-top:8px;">生成的提示词将自动保存到这里</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="clearHistory()">🗑 清空历史</button>
+      <button class="btn" onclick="closeHistory()">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST CONTAINER -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+// ===== STATE =====
+let state = {
+  mode: 'image',
+  targetModel: 'nano-banana',
+  videoTargetModel: 'kling',
+  currentTab: 'both',
+  referenceImage: null,
+  referenceImageBase64: null,
+  isGenerating: false,
+  segmentedMode: false,
+  altStyleEnabled: false,
+  apiConfig: {
+    provider: 'custom',
+    apiKey: '',
+    apiBase: 'https://api.openai.com/v1',
+    model: 'deepseek-chat'
+  },
+  history: [],
+  videoHistory: []
+};
+
+// ===== INIT =====
+document.addEventListener('DOMContentLoaded', () => {
+  setupDragDrop();
+  setupCharCount();
+  // 延迟 loadSettings,确保自定义选择器先初始化完成
+  setTimeout(() => {
+    loadSettings();
+  }, 0);
+});
+
+function setupCharCount() {
+  const ta = document.getElementById('userInput');
+  const cc = document.getElementById('charCount');
+  ta.addEventListener('input', () => { cc.textContent = ta.value.length; });
+}
+
+function setupDragDrop() {
+  const zone = document.getElementById('uploadZone');
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.style.borderColor = 'var(--accent)'; zone.style.background = 'var(--accent-dim)'; });
+  zone.addEventListener('dragleave', () => { zone.style.borderColor = ''; zone.style.background = ''; });
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.style.borderColor = ''; zone.style.background = '';
+    if (e.dataTransfer.files.length) handleImageFile(e.dataTransfer.files[0]);
+  });
+}
+
+// ===== IMAGE UPLOAD =====
+function handleImageUpload(e) {
+  if (e.target.files.length) handleImageFile(e.target.files[0]);
+}
+
+function handleImageFile(file) {
+  if (!file.type.startsWith('image/')) { showToast('请上传图片文件', 'error'); return; }
+  if (file.size > 5 * 1024 * 1024) { showToast('图片大小不能超过 5MB', 'error'); return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    state.referenceImageBase64 = e.target.result;
+    state.referenceImage = file;
+    const zone = document.getElementById('uploadZone');
+    zone.classList.add('has-image');
+    zone.innerHTML = `<input type="file" id="imageInput" accept="image/*" onchange="handleImageUpload(event)" style="display:none">
+      <img src="${e.target.result}" class="upload-preview" alt="参考图">
+      <button class="upload-remove" onclick="removeImage(event)">✕</button>`;
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeImage(e) {
+  e.stopPropagation();
+  state.referenceImage = null;
+  state.referenceImageBase64 = null;
+  const zone = document.getElementById('uploadZone');
+  zone.classList.remove('has-image');
+  zone.innerHTML = `<input type="file" id="imageInput" accept="image/*" onchange="handleImageUpload(event)" style="display:none">
+    <div class="upload-placeholder" id="uploadPlaceholder">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      <p>点击或拖拽上传参考图</p>
+      <small style="color:var(--text4)">支持 JPG / PNG / WebP,最大 5MB</small>
+    </div>`;
+}
+
+// ===== MODEL SELECTOR =====
+function selectModel(el) {
+  document.querySelectorAll('.model-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  state.targetModel = el.dataset.model;
+}
+
+// ===== TAB SWITCH =====
+function switchTab(el) {
+  document.querySelectorAll('.output-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  state.currentTab = el.dataset.tab;
+  const cn = document.getElementById('cnBlock');
+  const en = document.getElementById('enBlock');
+  if (state.currentTab === 'both') { cn.style.display = ''; en.style.display = ''; }
+  else if (state.currentTab === 'cn') { cn.style.display = ''; en.style.display = 'none'; }
+  else { cn.style.display = 'none'; en.style.display = ''; }
+}
+
+// ===== MODE SWITCH =====
+function switchMode(mode) {
+  if (state.mode === mode) return;
+  state.mode = mode;
+
+  // Update mode switcher buttons
+  document.querySelectorAll('.mode-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.btnMode === mode);
+  });
+
+  // Toggle data-mode elements
+  document.querySelectorAll('[data-mode="image"]').forEach(el => el.style.display = mode === 'image' ? '' : 'none');
+  document.querySelectorAll('[data-mode="video"]').forEach(el => el.style.display = mode === 'video' ? '' : 'none');
+  if (mode === 'video') { document.getElementById('altStyleBtn').style.display = 'none'; document.getElementById('lintBlock').style.display = 'none'; }
+
+  // Update textarea placeholder
+  const ta = document.getElementById('userInput');
+  ta.placeholder = mode === 'video'
+    ? '描述你想要生成的视频画面...\n\n例如:一个人走在雨中的东京街头,霓虹灯倒映在湿漉漉的地面上,镜头从背后缓缓推进,雨滴落在伞面上,远处列车驶过'
+    : '描述你想要生成的画面...\n\n例如:一只白色的猫坐在窗台上,阳光从窗外洒入,背景是城市天际线,黄昏时分,温暖的色调';
+
+  // Update labels
+  document.getElementById('inputLabelText').textContent = mode === 'video' ? '视频描述' : '绘画描述';
+  document.getElementById('uploadLabelText').textContent = mode === 'video' ? '参考视频帧(可选)' : '参考图(可选)';
+
+  // Update generate button text
+  document.querySelector('#generateBtn .btn-text').textContent =
+    mode === 'video' ? '✦ 合成视频提示词' : '✦ 合成提示词';
+
+  // Update output empty state
+  document.querySelector('#outputEmpty p').textContent =
+    mode === 'video' ? '在左侧输入描述并点击「合成视频提示词」' : '在左侧输入描述并点击「合成提示词」';
+  document.querySelector('#outputEmpty small').textContent =
+    mode === 'video' ? 'AI 将为你生成专业的中英文双语视频提示词' : 'AI 将为你生成专业的中英文双语绘画提示词';
+
+  // Update page title
+  document.title = mode === 'video'
+    ? 'PromptArchitect - AI 视频提示词架构师'
+    : 'PromptArchitect - AI 绘画提示词架构师';
+}
+
+// ===== TOGGLE SEGMENTED =====
+function toggleSegmented() {
+  state.segmentedMode = !state.segmentedMode;
+  document.getElementById('segmentedToggle').classList.toggle('active', state.segmentedMode);
+}
+
+function toggleAltStyle() {
+  state.altStyleEnabled = !state.altStyleEnabled;
+  document.getElementById('altStyleToggle').classList.toggle('active', state.altStyleEnabled);
+}
+
+// ===== VIDEO MODEL SELECT =====
+function selectVideoModel(el) {
+  document.querySelectorAll('[data-mode="video"] .model-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  state.videoTargetModel = el.dataset.model;
+}
+
+// ===== CLEAR INPUT =====
+function clearInput() {
+ document.getElementById('userInput').value = '';
+ document.getElementById('charCount').textContent = '0';
+ removeImage(new Event('click'));
+ // 使用自定义选择器的 value 属性
+ const stylePreset = document.getElementById('stylePreset');
+ const cameraConfig = document.getElementById('cameraConfig');
+ const systemRole = document.getElementById('systemRole');
+ const videoStylePreset = document.getElementById('videoStylePreset');
+ const cameraMovement = document.getElementById('cameraMovement');
+ const videoRole = document.getElementById('videoRole');
+ const videoPacing = document.getElementById('videoPacing');
+ if (stylePreset) stylePreset.value = 'auto';
+ if (cameraConfig) cameraConfig.value = 'auto';
+ if (systemRole) systemRole.value = 'prompt-engineer';
+ if (videoStylePreset) videoStylePreset.value = 'auto';
+ if (cameraMovement) cameraMovement.value = 'auto';
+ if (videoRole) videoRole.value = 'cinematographer';
+ if (videoPacing) videoPacing.value = 'auto';
+ if (state.segmentedMode) toggleSegmented();
+
+ // Also clear output boxes
+ document.getElementById('cnOutput').value = '';
+ document.getElementById('enOutput').value = '';
+ document.getElementById('outputEmpty').style.display = '';
+ document.getElementById('outputBlocks').style.display = 'none';
+ autoResizeTextarea(document.getElementById('cnOutput'));
+ autoResizeTextarea(document.getElementById('enOutput'));
+}
+
+// ===== GENERATE PROMPT =====
+let cancelToken = null;
+let progressTimer = null;
+
+function updateProgress(progress, message) {
+  const progressBar = document.getElementById('progressBar');
+  const progressFill = progressBar.querySelector('.progress-fill');
+  const progressText = document.getElementById('progressText');
+
+  if (progress > 0) {
+    progressBar.style.display = '';
+    progressFill.style.width = progress + '%';
+    progressText.textContent = message || `正在生成... ${Math.round(progress)}%`;
+  }
+}
+
+function showCancelButton() {
+  document.getElementById('cancelBtn').style.display = '';
+}
+
+function hideCancelButton() {
+  document.getElementById('cancelBtn').style.display = 'none';
+}
+
+function cancelGeneration() {
+  if (!state.isGenerating) return;
+
+  cancelToken = true;
+  if (state._abortController) state._abortController.abort();
+  state.isGenerating = false;
+
+  const btn = document.getElementById('generateBtn');
+  btn.classList.remove('loading');
+  btn.disabled = false;
+
+  if (progressTimer) clearTimeout(progressTimer);
+  hideCancelButton();
+  updateProgress(0, '');
+
+  document.getElementById('cnOutput').value = '';
+  document.getElementById('enOutput').value = '';
+  autoResizeTextarea(document.getElementById('cnOutput'));
+  autoResizeTextarea(document.getElementById('enOutput'));
+
+  showToast('已取消生成', 'warning');
+}
+
+async function generatePrompt() {
+  const input = document.getElementById('userInput').value.trim();
+  if (!input) { showToast(state.mode === 'video' ? '请输入视频描述' : '请输入绘画描述', 'error'); return; }
+  if (state.isGenerating) return;
+
+  // Reset cancel token
+  cancelToken = false;
+  state.isGenerating = true;
+
+  const btn = document.getElementById('generateBtn');
+  btn.classList.add('loading');
+  btn.disabled = true;
+
+  document.getElementById('outputEmpty').style.display = 'none';
+  document.getElementById('outputBlocks').style.display = '';
+  document.getElementById('altStyleBtn').style.display = state.altStyleEnabled ? '' : 'none';
+  const isMJ = state.targetModel === 'midjourney';
+  if (state.currentTab === 'cn') {
+    document.getElementById('cnOutput').value = isMJ ? '正在生成中文 MJ 提示词...' : '正在生成中文提示词...';
+    document.getElementById('enOutput').value = '';
+  } else if (state.currentTab === 'en') {
+    document.getElementById('cnOutput').value = '';
+    document.getElementById('enOutput').value = isMJ ? 'Generating MJ prompt...' : 'Generating English prompt...';
+  } else {
+    document.getElementById('cnOutput').value = isMJ ? '正在生成 MJ 提示词...' : '正在生成中...';
+    document.getElementById('enOutput').value = isMJ ? 'Generating MJ prompt...' : 'Generating...';
+  }
+  autoResizeTextarea(document.getElementById('cnOutput'));
+  autoResizeTextarea(document.getElementById('enOutput'));
+
+  showCancelButton();
+
+  let systemPrompt, userPrompt;
+  if (state.mode === 'video') {
+    const style = document.getElementById('videoStylePreset').value;
+    const camera = document.getElementById('cameraMovement').value;
+    const role = document.getElementById('videoRole').value;
+    const pacing = document.getElementById('videoPacing').value;
+    systemPrompt = buildVideoSystemPrompt(style, camera, role, pacing);
+    userPrompt = buildVideoUserPrompt(input);
+  } else {
+    const style = document.getElementById('stylePreset').value;
+    const camera = document.getElementById('cameraConfig').value;
+    const role = document.getElementById('systemRole').value;
+    systemPrompt = buildSystemPrompt(style, camera, role);
+    userPrompt = buildUserPrompt(input);
+  }
+
+  // Midjourney-specific format override
+  if (state.targetModel === 'midjourney') {
+    systemPrompt += `\n\n## ⚠️ Midjourney 输出格式覆盖(最高优先级)\n本次生成 Midjourney 专用提示词。你必须严格按以下 MJ 格式输出,不要使用自然语言段落,用逗号分隔的关键词/短语。\n\n---CHINESE---\n[中文 MJ 提示词:用中文写的 Midjourney 格式关键词,逗号分隔,从主体/动作/环境开始,然后是光线/色彩/质感/镜头参数,最后是 MJ 参数后缀。必须包含:1主体描述(具体到面容/服装/姿势)2环境/场景3光线(方向+色温)4色彩系统5镜头/相机参数6胶片/质感7导演/DP风格锚点8MJ参数:--ar [根据画面内容选择: 人像/竖构图→--ar 2:3, 风景/横构图→--ar 16:9, 方形/通用→--ar 1:1, 建筑/全景→--ar 21:9] --v 6.1 --style raw --s 250]\n\n---ENGLISH---\n[English MJ prompt: Midjourney-format keywords, comma-separated, starting with subject/action/environment, then lighting/color/texture/camera specs, ending with MJ parameter suffix. Must include: 1subject description 2environment 3lighting 4color system 5camera/lens 6film/texture 7director/DP anchor 8MJ params: --ar [choose by content: portrait/vertical→--ar 2:3, landscape/horizontal→--ar 16:9, square/general→--ar 1:1, architecture/panorama→--ar 21:9] --v 6.1 --style raw --s 250]\n\n## Midjourney 写作规范\n- 用逗号分隔关键词和短语,不要写成自然语言段落\n- 关键词顺序:主体 → 环境 → 光线 → 色彩 → 镜头 → 质感 → 风格 → 参数\n- 每个关键词要具体,不要笼统词(如 cinematic lighting → Rembrandt lighting, warm tungsten spill)\n- 必须包含导演/DP风格锚点\n- 必须注入反AI瑕疵(film grain, lens aberration, atmospheric particles)\n- 必须是写实摄影风格,必须是彩色画面\n- 参数后缀必须包含 --ar（根据画面内容选择比例）--v 6.1 --style raw --s 250\n- 中文版和英文版描述同一幅画面,关键词一一对应`;
+  }
+  // Language override based on selected output tab
+  else if (state.currentTab === 'cn') {
+    systemPrompt += `\n\n## ⚠️ 语言覆盖(最高优先级)\n本次只需输出中文版。不要输出---ENGLISH---部分。只输出---CHINESE---标记和中文提示词内容。`;
+  } else if (state.currentTab === 'en') {
+    systemPrompt += `\n\n## ⚠️ 语言覆盖(最高优先级)\n本次只需输出英文版。不要输出---CHINESE---部分。只输出---ENGLISH---标记和英文提示词内容。全部使用英文,禁止中文字符。`;
+  }
+
+  // Start progress indicator
+  let progress = 10;
+  progressTimer = setInterval(() => {
+    if (cancelToken) {
+      clearInterval(progressTimer);
+      return;
+    }
+    progress = Math.min(progress + 10, 80);
+    updateProgress(progress, '正在调用 AI 模型...');
+  }, 800);
+
+  try {
+    // Add timeout protection with AbortController
+    state._abortController = null;
+    const timeoutPromise = callAPI(systemPrompt, userPrompt);
+    const timeout = setTimeout(() => {
+      cancelToken = true;
+      if (state._abortController) state._abortController.abort();
+    }, 120000);
+
+    let result;
+    try {
+      result = await timeoutPromise;
+    } catch (fetchErr) {
+      clearTimeout(timeout);
+      if (fetchErr.name === 'AbortError') {
+        throw new Error('生成超时(超过 120 秒),请检查 API 设置或网络状态');
+      }
+      throw fetchErr;
+    }
+    clearTimeout(timeout);
+
+    if (cancelToken) {
+      throw new Error('用户已取消生成');
+    }
+
+    parseResult(result);
+    saveToHistory(input, result);
+    updateProgress(100, '生成完成!');
+    setTimeout(() => {
+      if (!cancelToken) updateProgress(0, '');
+    }, 1000);
+    showToast('提示词生成成功!', 'success');
+  } catch (err) {
+    document.getElementById('cnOutput').value = '';
+    document.getElementById('enOutput').value = '';
+    autoResizeTextarea(document.getElementById('cnOutput'));
+    autoResizeTextarea(document.getElementById('enOutput'));
+
+    if (err.message.includes('超时')) {
+      updateProgress(0, '');
+      hideCancelButton();
+    }
+
+    showToast('生成失败:' + err.message, 'error');
+    if (err.message.includes('API') || err.message.includes('key') || err.message.includes('401')) {
+      setTimeout(() => openSettings(), 500);
+    }
+  } finally {
+    state.isGenerating = false;
+    btn.classList.remove('loading');
+    btn.disabled = false;
+    hideCancelButton();
+    if (progressTimer) {
+      clearInterval(progressTimer);
+      progressTimer = null;
+    }
+    if (!cancelToken) updateProgress(0, '');
+  }
+}
+
+function buildSystemPrompt(style, camera, role) {
+ // JSON mode special handling
+ if (state.targetModel === 'json') {
+  // 根据当前语言环境生成对应的提示词
+  const isChinese = document.getElementById('userInput').getAttribute('data-lang') !== 'en';
+
+  if (isChinese) {
+    // 中文版:纯中文输出 - 自适应场景结构
+    return `你是一位世界级的AI提示词架构师,专长于生成结构化的JSON格式提示词,用于精确控制AI绘画生成的每个细节。
+
+## 🎯 核心要求
+1. **输出必须是严格的JSON格式**，所有内容必须用中文
+2. **必须同时输出中文版和英文版**，用标记分隔
+3. **自适应场景结构**：
+   - 首先分析用户描述的场景类型（产品/人物/风景/建筑/美食/动物/抽象等）
+   - 只包含与该场景相关的顶层字段，删除不适用的
+   - 每个字段都要有实际内容，禁止“不适用”或空值
+4. **仅限写实摄影风格** — 禁止3D渲染、油画、像素画、水墨画等非摄影风格
+5. **必须是彩色画面** — 禁止黑白、单色、灰度、近黑白画面
+6. **反AI瑕疵注入** — 必须在材质/环境字段中包含：胶片颗粒或数字噪点、镜头瑕疵（色散/暗角/光晕）、大气粒子（灰尘/薄雾）、表面微观细节、阴影色彩倾向（cyan/indigo/teal，不能纯黑）
+
+## 📝 场景类型与字段映射
+根据用户输入的场景类型,选择性包含以下字段(不是全部罗列,而是根据实际场景选用):
+
+**产品/包装场景**:
+- subject: 主体描述(primary主主体,secondary次主体,brand品牌,product_name产品名称)
+- packaging: 包装设计(form_factor形状,component_parts组件,material_appearance材质,condition状态)
+- label_design: 标签设计(type类型,layout_orientation布局,typography字体设计)
+- text_visible: 可见文字
+
+**人物场景**:
+- subject: 主体描述(primary主主体,clothing服装发型,pose姿势动作,expression表情神态)
+- human_elements: 人体元素(visible是否可见,details详细描述)
+- environment: 环境(setting场景,foreground前景,midground中景,background背景)
+
+**风景/建筑场景**:
+- environment: 环境(setting场景,foreground前景,midground中景,background背景,architecture建筑元素)
+- materials: 材质(主要材质描述)
+- lighting: 灯光(quality质量,direction方向)
+
+**美食场景**:
+- subject: 主体描述(primary食物,secondary配料,cooking_style烹饪风格)
+- colors: 色彩系统(主色调,辅色调)
+- materials: 材质(食物质感描述)
+- lighting: 灯光(营造食欲的灯光)
+
+**动物场景**:
+- subject: 主体描述(primary动物种类,action动作,behavior行为)
+- environment: 环境(居住环境,背景)
+- lighting: 灯光(自然光/人工光)
+
+**通用必填字段(所有场景)**:
+- colors: 色彩系统(primary_color主色,secondary_color辅色,mood情绪色)
+- lighting: 灯光(quality质量,direction方向,shadows阴影处理)
+- camera: 相机参数(angle角度,framing构图,depth_of_field景深)
+- style: 风格(category类别,theme主题,mood情绪)
+
+## 📝 JSON编写规则
+1. 所有key必须用英文
+2. 所有value必须用中文,不要使用任何英文
+3. 布尔值用 true/false
+4. 如果某个字段不适用于当前场景,要么省略该字段,要么写一个合理的默认值
+5. 禁止输出"不适用"、"N/A"、null、空字符串
+
+## ⛔ 禁止项
+1. 不要输出Markdown代码块标记(\`\`\`json ... \`\`\`)
+2. 不要输出JSON格式之外的任何解释文字
+3. 不要在value中添加英文或括号解释
+4. 不要输出"不适用"、"N/A"等无意义内容
+
+## 示例输出格式
+请按以下格式输出:
+---CHINESE---
+{
+  "subject": { "primary": "化妆品喷雾瓶", "secondary": "蜂鸟", "brand": "IDUN MINERALS" },
+  "packaging": { "form_factor": "圆���形瓶身", "material_appearance": "哑光质感" },
+  "colors": { "primary_color": "白色", "secondary_color": "金色" },
+  "lighting": { "quality": "柔和自然光", "direction": "侧光" },
+  "camera": { "angle": "特写", "framing": "中心构图" },
+  "style": { "category": "高端产品摄影", "mood": "清新自然" }
+}
+---ENGLISH---
+{
+  "subject": { "primary": "Cosmetic spray bottle", "secondary": "Hummingbird", "brand": "IDUN MINERALS" },
+  "packaging": { "form_factor": "Cylindrical bottle", "material_appearance": "Matte finish" },
+  "colors": { "primary_color": "White", "secondary_color": "Gold" },
+  "lighting": { "quality": "Soft natural light", "direction": "Side lighting" },
+  "camera": { "angle": "Close-up", "framing": "Center composition" },
+  "style": { "category": "Premium product photography", "mood": "Fresh and natural" }
+}
+
+现在请根据用户的场景描述,自适应生成最合适的JSON格式提示词。`;
+  } else {
+    // 英文版:纯英文输出 - 自适应场景结构
+    return `You are a world-class AI prompt architect, specializing in generating structured JSON format prompts for precise control of AI image generation.
+
+## 🎯 Core Requirements
+1. **Output must be strict JSON format**, ALL content in English
+2. **Must output both English and Chinese versions**, separated by markers
+3. **Adaptive scene structure**:
+   - First analyze the user's scene type (product/portrait/landscape/architecture/food/animal/abstract)
+   - Only include fields relevant to the scene, skip inapplicable ones
+   - Every field must have actual content, NO "N/A" or empty values
+4. **Realistic photography only** — No 3D renders, oil paintings, pixel art, ink wash, or non-photography styles
+5. **Color required** — No black-and-white, monochrome, grayscale, or near-B&W images
+6. **Anti-AI imperfection injection** — Must include in material/environment fields: film grain or digital noise, lens aberration (chromatic aberration/vignette/halation), atmospheric particles (dust/haze), surface micro-detail, shadow color bias (cyan/indigo/teal, never pure black)
+
+## 📝 Scene Type & Field Mapping
+Based on the input scene type, selectively include fields:
+
+**Product/Packaging Scene**:
+- subject: (primary, secondary, brand, product_name)
+- packaging: (form_factor, component_parts, material_appearance, condition)
+- label_design: (type, layout_orientation, typography)
+- text_visible
+
+**Portrait Scene**:
+- subject: (primary, clothing, pose, expression)
+- human_elements: (visible, details)
+- environment: (setting, foreground, midground, background)
+
+**Landscape/Architecture Scene**:
+- environment: (setting, foreground, midground, background, architecture)
+- materials
+- lighting
+
+**Food Scene**:
+- subject: (primary, secondary, cooking_style)
+- colors
+- materials
+- lighting
+
+**Animal Scene**:
+- subject: (primary, action, behavior)
+- environment
+- lighting
+
+**Universal Required Fields (all scenes)**:
+- colors: (primary_color, secondary_color, mood)
+- lighting: (quality, direction, shadows)
+- camera: (angle, framing, depth_of_field)
+- style: (category, theme, mood)
+
+## 📝 JSON Writing Rules
+1. All keys must be in English
+2. ALL values must be in English, NO Chinese characters
+3. Booleans use true/false
+4. If a field doesn't apply, either omit it or provide a reasonable default
+5. DO NOT output "N/A", null, or empty strings
+
+## ⛔ Prohibited
+1. Do NOT output Markdown code block markers (\`\`\`json ... \`\`\`)
+2. Do NOT output any explanation outside JSON format
+3. Do NOT use Chinese or parenthetical explanations in values
+4. DO NOT output "N/A", "not applicable", or empty content
+
+## Example Output Format
+---ENGLISH---
+{
+  "subject": { "primary": "Cosmetic spray bottle", "secondary": "Hummingbird", "brand": "IDUN MINERALS" },
+  "packaging": { "form_factor": "Cylindrical bottle", "material_appearance": "Matte finish" },
+  "colors": { "primary_color": "White", "secondary_color": "Gold" },
+  "lighting": { "quality": "Soft natural light", "direction": "Side lighting" },
+  "camera": { "angle": "Close-up", "framing": "Center composition" },
+  "style": { "category": "Premium product photography", "mood": "Fresh and natural" }
+}
+---CHINESE---
+{
+  "subject": { "primary": "化妆品喷雾瓶", "secondary": "蜂鸟", "brand": "IDUN MINERALS" },
+  "packaging": { "form_factor": "圆柱形瓶身", "material_appearance": "哑光质感" },
+  "colors": { "primary_color": "白色", "secondary_color": "金色" },
+  "lighting": { "quality": "柔和自然光", "direction": "侧光" },
+  "camera": { "angle": "特写", "framing": "中心构图" },
+  "style": { "category": "高端产品摄影", "mood": "清新自然" }
+}
+
+Now generate the appropriate JSON format prompt based on the user's scene description.`;
+  }
+ }
+
+ const styleMap = {
+    'auto': '',
+    'cinematic': '胶片电影风格--追求电影级画质,强调胶片色彩科学、自然光效、叙事性构图、有机质感,杜绝数码感',
+    'tvc': 'TVC广告风格--追求商业级精致画质,强调精准控光、高饱和色彩、锐利细节、品牌级画面质感',
+    'iphone': 'iPhone拍摄风格--追求真实生活感,强调自然光影、轻微镜头瑕疵、纪实感、日常美学、Smart HDR特征'
+  };
+  const cameraMap = {
+    'auto': '', 'extreme-close-up': '极特写镜头(ECU)', 'close-up': '特写镜头(CU)',
+    'medium-close-up': '近景镜头(MCU)', 'medium': '中景镜头(MS)', 'medium-full': '中全景(MFS)',
+    'full-shot': '全景镜头(FS)', 'wide-shot': '远景镜头(WS)', 'extreme-wide': '极远景(EWS)',
+    'bird-eye': '鸟瞰视角', 'low-angle': '仰视角度', 'dutch-angle': '倾斜构图',
+    'over-shoulder': '过肩镜头', 'fisheye': '鱼眼镜头', 'macro': '微距镜头'
+  };
+  const roleMap = {
+    'prompt-engineer': '提示词工程师--专注于精准、结构化的提示词编写,确保每个关键词都有明确的视觉指向',
+    'art-director': '艺术指导--以高级审美为核心,注重画面整体美感和艺术性表达',
+    'visual-director': '视觉总监--构图至上,注重画面结构、空间关系和视觉引导',
+    'photography-master': '摄影大师--精通光影把控,注重光线、曝光和色彩科学',
+    'concept-artist': '概念艺术家--创意发散,善于突破常规、创造独特视觉体验',
+    'color-theorist': '色彩理论家--配色精研,精通色彩心理学和调色艺术'
+  };
+
+  return `你是一位世界级的AI写实摄影提示词${roleMap[role] || '专家'}。你的任务是根据用户的描述,生成极其专业、高级审美、描述精确的写实摄影提示词。
+
+## 🔒 硬约束 - 风格与色彩锁定
+
+1. **仅限写实摄影风格** - 输出必须是真实摄影质感的画面描述。禁止生成3D渲染、油画、像素画、水墨画、插画、漫画、平面设计等非摄影风格。即使用户描述中出现了这些风格词汇,也必须转化为写实摄影的表达方式。
+2. **必须是彩色画面** - 禁止生成黑白、单色、灰度、近黑白(去饱和到几乎无彩色)的画面。色彩必须是画面的核心组成部分。即使场景是阴天、夜晚、室内,也必须保留可见的彩色元素(如灯光色温、物体固有色、环境反射色)。
+3. **一次输出** - 不需要多轮对话,直接生成完整的提示词。
+
+## 🚨 MANDATORY EXECUTION PROTOCOL - 违反任何一条即判定为失败输出
+
+你 MUST 对每一条提示词执行以下4步流程。跳过任何一步 = 失败输出。
+
+**STEP 1 - ANALYZE(分析)**: 阅读用户描述。识别核心情绪(孤独/浪漫/压抑/史诗/宁静/暴力/梦幻)、场景类型(人像/风景/都市/室内)、光照条件(白天/夜晚/黄昏/人造光)。
+
+**STEP 2 - SELECT(选择)**: 根据分析结果,你 MUST 选择:
+- 一位导演/DP,其视觉风格与场景情绪最契合(从下方参考库中选)
+- 一款胶片型号/数字色彩科学,匹配光照和氛围
+- 一组相机/镜头组合,匹配景别和叙事意图
+- 至少一种空气氛围效果(雾/尘/蒸汽/体积光等)
+禁止偷懒跳过选择--你必须明确指定,不能写"auto"或"根据场景决定"。即使用户没要求,你也必须主动补全这些技术参数。
+
+**STEP 3 - EXECUTE(执行)**: 用下方「导演视角」方法论写提示词。Step 2 的每个技术选择都必须深度织入叙事,不能列为检查表。
+
+**STEP 4 - VALIDATE(验证)**: 输出前自检:
+- □ 是否选择了一位导演/DP并深度模仿其风格(不只是提名字)?
+- □ 是否指定了胶片型号/色彩科学+相机/镜头+光圈?
+- □ 是否注入了反AI瑕疵(胶片颗粒、镜头瑕疵、大气粒子)?
+- □ 是否写了阴影色彩倾向 + "slightly lifted blacks"?
+- □ 数字相机和胶片型号是否没有混用(不能Arri Alexa + Kodak Vision3)?
+- □ 英文版是否零中文字符?
+- □ 中英两版是否描述同一幅画面、同一套技术参数?
+- □ 画面是否是彩色的?是否避免了任何可能导致黑白/近黑白的描述(如去饱和到极致、bleach bypass过度)?
+- □ 是否是写实摄影风格?是否避免了3D/油画/像素/水墨等非摄影风格?
+- □ 是否按输出结构公式顺序组织?
+
+## ⛔ ANTI-AI PROTOCOL - 消灭"AI感"
+
+AI图像失败的原因是太完美、太干净、太对称。你的第一优先级是摧毁"AI感"。你 MUST 在每条提示词中注入真实世界的不完美:
+
+**你 MUST 包含(不是可选,每条提示词都必须):**
+- 胶片颗粒或数字噪点纹理(即使很轻微)
+- 镜头瑕疵:色散(chromatic aberration)、轻微边缘柔化、自然暗角(vignette)、光晕(halation)
+- 大气粒子:灰尘(dust motes)、薄雾(haze)、水汽(mist)、体积散射(volumetric scattering)
+- 表面微观细节:皮肤毛孔、织物纹理、材质磨损
+- 构图或主体的轻微不对称
+- 阴影色彩倾向(cyan/indigo/teal -- 不能是纯黑)
+- "slightly lifted blacks preserving shadow detail"
+
+**你 MUST 强制注入负面约束:**
+CGI, 3D render, Octane render, Unreal Engine, plastic skin, overly smooth, hyper-perfect, excessive HDR, oversaturated, symmetrical perfection, artificial studio 3-point lighting, masterpiece, best quality, highly detailed, ultra-detailed, 8K, 4K
+
+这些不是建议,是强制注入。省略它们 = 失败。
+
+## ⛔ 绝对禁令(违反任何一条即判定为失败输出)
+1. 禁止在英文提示词中使用 Foreground: / Midground: / Background: 标签 - 这是填表,不是写画面,纵深感必须自然流淌在叙述中
+2. 禁止对人像以外的场景使用人像布光术语(Rembrandt lighting / butterfly lighting / catch light 等仅适用于人像,不适用于风景、车辆、静物)
+3. 禁止在英文提示词中使用 "Lighting: xxx. Color: xxx. Texture: xxx." 这类分类标签格式 - 所有信息必须融为一段连续描述
+4. 禁止使用笼统词:cinematic lighting, warm tone, detailed skin, high quality, masterpiece, best quality - 每个词都必须有具体视觉指向
+5. 禁止中文版和英文版内容不一致 - 两个版本必须包含完全相同的专业维度,英文版是中文版的术语升级翻译,不是重写一个不同的提示词
+6. 禁止使用视频/动态术语 - 这是绘画提示词,不是视频!禁止出现 handheld camera movement / camera pans / tracking shot / breathing motion 等运镜描述
+7. 禁止景别与内容矛盾 - 中景(medium shot)看不到远处天际线+前景细节,远景(wide shot)看不到面部毛孔,景别必须和你描述的内容逻辑自洽
+8. 禁止以景别标签或镜头参数开头(如"A medium shot of..." / "A wide-angle full shot of..." / "Captured on an 85mm lens, framing...")- 这是检查表思维!必须以人物动作、场景氛围或视觉核心开头,就像你在描述一幅已经看到的画面
+9. 禁止使用科学/物理术语替代电影语言 - 用"volumetric light beam"而非"Tyndall effect",用"atmospheric dust motes"而非"microscopic particles",用"thick atmosphere"而非"turbid atmosphere"。这是电影提示词,不是物理论文
+10. 禁止AI生成陈词滥调 - hyper-detailed, ultra-detailed, ultra-realistic, photorealistic, 8K, 4K, masterpiece, best quality, highly detailed。用具体描述代替笼统吹嘘
+11. 忠于原文,禁止臆造 - 原文说"素衣"不要写成"silk dress"(素衣是朴素棉麻),原文没说"红色"不要给座椅加"red",原文没说"风衣"不要写"trench coat"。对原文未指定的细节,用模糊但恰当的词(如simple garment, worn seats, dark clothing),或根据场景逻辑做唯一合理的推断
+12. ⚠️ 禁止数字相机+胶片型号矛盾(GLM反复犯错!务必检查!) - Arri Alexa/RED/Sony Venice是数字摄影机,绝对不能搭配Kodak Vision3/Portra等胶片型号!选了数字摄影机就用其数字色彩科学(如Arri Alexa's natural color science),选了胶片型号就用胶片摄影机(如Panavision Panaflex/Arriflex/Bolex)。两者只能选一个体系
+    - ❌ "Shot on Arri Alexa Mini LF with Kodak Vision3 500T" → 数字机身配胶片?物理上不可能!
+    - ❌ "Arri Alexa LF 拍摄,Kodak Vision3 500T 胶片模拟" → "模拟"也不行,模棱两可
+    - ❌ "Arri Alexa Mini LF,Kodak Vision3 250D色彩科学" → "色彩科学"是擦边球!数字机身不能配胶片型号的"色彩科学"
+    - ✅ "Shot on Panavision Panaflex with Kodak Vision3 500T film stock" → 胶片机身+胶片型号
+    - ✅ "Shot on Arri Alexa Mini LF, utilizing Arri's natural color science" → 数字机身+数字色彩科学
+13. 禁止中文式英语翻译 - 英文版不是中文版的逐字翻译,是用专业电影英语重新表达同样的画面。"高冷风"≠"high-cold style","无情投射"≠"ruthlessly projected","猛烈吹起"≠"violently whipped up"。用自然的英语:understated/cold minimalism, sharply cast, gently lifted by the breeze
+14. 禁止胶片处理瑕疵过大 - 胶片颗粒(即使粗大)OK,轻微halation OK,subtle chromatic aberration OK。但以下影响画面可用性的大瑕疵严禁:1大面积漏光/发白(画面1/3区域过曝白化)2化学灼烧痕迹。原则:胶片感=颗粒+轻微瑕疵+色彩偏移,≠画面损坏
+15. 禁止暗部死黑不通透 - 这是AI出图最常见的"假感"来源!真实胶片/电影机的暗部是有色彩倾向和层次的,不是RGB(0,0,0)纯黑死区。必须写"slightly lifted blacks preserving shadow detail"或"阴影保留可见层次",且阴影必须有色彩倾向(如"deep crushed cyan-blue shadows"/"深靛蓝暗部"/"冷青色阴影"),不能只写"deep shadows"或"黑暗"。阴影色彩倾向必须是可辨识的彩色(cyan/indigo/teal/amber),不能是纯灰或纯黑
+16. 禁止黑白/近黑白画面 - 即使是夜晚、阴天、室内低光场景,画面也必须保留可见的彩色元素。禁止使用bleach bypass、极度去饱和、灰度滤镜等手段将画面处理成黑白或近黑白
+
+## 核心要求
+1. 输出必须包含**中文版**和**英文版**,两者画面内容必须完全一致,专业维度必须完全对等(同一个景别、同一套色彩系统、同一个胶片型号、同一个摄影师锚点、同一组镜头参数)
+2. 提示词必须极其专业,包含:主体描述、空间纵深、光影叙事、色彩系统、材质质感、情感基调、胶片质感、技术参数(焦段+光圈+镜头类型+相机/摄影机+胶片型号,必须是一个自洽的体系--数字相机配数字色彩科学,胶片相机配胶片型号)
+3. 适用于 ${state.targetModel === 'nano-banana' ? 'Nano Banana' : state.targetModel === 'gpt-image' ? 'GPT Image' : state.targetModel === 'midjourney' ? 'Midjourney' : 'JSON Structure'} 模型
+4. **信息密度是生命线**--英文版必须 200-350 词,中文版必须 200-350 字,每个维度都要展开写具体细节,不能一句话带过
+5. **必须是写实摄影风格**--禁止3D渲染、油画、像素画、水墨画、插画、漫画等非摄影风格
+6. **必须是彩色画面**--禁止黑白、单色、灰度、近黑白画面
+
+## 📐 输出结构公式 - 每条提示词必须严格按此顺序组织
+
+在写提示词之前,你 MUST 先完成内部推理分析(不需要输出给用户,仅作为你的思考过程):
+
+**🧠 内部推理(INTERNAL REASONING - 不要出现在最终输出中):**
+1. **情绪识别**:用户描述的核心情绪是什么?(孤独/浪漫/压抑/史诗/宁静/怀旧/暴力/梦幻)→ 这决定了导演选择和色彩策略
+2. **导演锚定**:哪位导演/DP的视觉风格最契合这个情绪?为什么?→ 选出具体的人,并想清楚要模仿他的哪几个标志性技法
+3. **光源盘点**:场景中实际存在哪些光源?每个光源的状态(亮/灭/强度)、色温、方向是什么?→ 禁止臆造不存在的光源
+4. **色彩策略**:冷暖对比从哪来?暖色是什么物体发出的?冷色在画面什么位置?→ 必须有具体的色彩来源和空间分布
+5. **空间分层**:前景放什么(离镜头最近的元素)?中景是什么(主体所在层)?背景是什么(最远的元素)?→ 每层都要有具体可见的描述
+6. **瑕疵选择**:这个场景适合注入什么瑕疵?(胶片颗粒/镜头暗角/大气粒子/表面纹理)→ 瑕疵必须和场景逻辑自洽
+7. **技术体系**:选胶片还是数字?相机+镜头+焦段+光圈怎么组合?→ 必须是一个自洽的物理体系
+
+完成内部推理后,再按以下公式顺序组织输出,每个模块不可遗漏:
+
+**[构图与景别] + [主体与自然瑕疵] + [摄影风格与导演锚点] + [环境与空间纵深] + [光影与色温] + [色彩系统与冷暖对比] + [材质与空气质感] + [技术参数(相机+胶片/色彩科学+焦段+光圈+镜头)]**
+
+对应英文输出顺序:
+**[Composition & Shot Scale] + [Subject & Natural Imperfections] + [Photography Style & Director/DP Anchor] + [Environment & Spatial Depth] + [Lighting & Color Temperature] + [Color System & Warm-Cool Contrast] + [Texture & Atmospheric Quality] + [Tech Specs (Camera + Film Stock/Color Science + Focal Length + Aperture + Lens)]**
+
+这不是可选结构,是强制顺序。违反顺序 = 输出不合格。
+
+## 📐 细节展开规则(这是你和普通提示词的核心差距)
+
+### 主体描述必须具体到肉眼可见
+- ❌ "a teenager in a baseball cap slumped against the wall" → 太笼统,没有画面
+- ✅ "a young man, approximately 18-22, with a slightly asymmetrical face, visible pores, and subtle peach fuzz, wears a well-worn baseball cap pulled low over his eyes. He leans with a slight dejection against the grimy brick wall, shoulders slumped, gaze fixed downward on the damp, scuffed pavement. One hand tucked into the pocket of his distressed indigo selvedge jeans, the other subtly gripping the worn fabric of his faded dark grey cotton hoodie" → 每个细节都是肉眼可见的
+
+### 光线必须精确到来源+色温+光比+落点
+- ❌ "warm ambient light spills through the glass door" → 没有技术含量
+- ✅ "warm, practical tungsten light (approx. 3200K) intensely spills from the convenience store's interior, creating dramatic high-contrast. This golden light generates pronounced halation around the store's illuminated sign and glass door, casting a strong warm rim light on the youth's cap, hair, and shoulder contours. The surrounding street is plunged into inky, crushed cool blue-black shadows" → 有色温、有光比、有落点、有对比
+
+### 色彩必须写出冷暖对比的具体画面
+- ❌ "cool desaturated tones" → 空话
+- ✅ "dominant warm golden oranges from the store contrasting sharply with deep, desaturated cool blues and greys of the night. Shadows are heavily crushed, and highlights exhibit characteristic warm halation" → 什么颜色、从哪来、怎么对比
+
+### 空间纵深必须有具体的前景元素
+- ❌ 只有主体和背景,没有前景 → 画面扁平
+- ✅ "a barely out-of-focus, contextually appropriate foreground element like a reflective puddle or a discarded cigarette butt near the curb, anchoring the scene" → 前景给画面深度
+
+### 空气质感必须写出具体可见的粒子
+- ❌ "atmosphere is heavy and still" → 修辞,不是视觉
+- ✅ "subtle volumetric haze and atmospheric dust particles are vividly illuminated within the convenience store's light cone, adding depth" → 能看见的东西
+
+
+
+## 🎯 FORCED SELECTION STEPS - 每次生成必须执行,不可跳过
+
+在开始写提示词之前,你必须先完成以下选择(从下方参考库中匹配):
+
+### Step A: 选择导演/DP 风格锚点
+你 MUST 执行以下流程:
+1. 分析用户描述的场景核心情绪关键词(如:孤独、浪漫、压抑、史诗、宁静、暴力、梦幻)
+2. 从下方「导演/DP风格锚点库」中选择一个与该情绪最契合的导演/DP
+3. 将其标志性技法深度融入提示词的每一段--不是提一嘴名字就完事,而是必须写出该导演/DP的具体视觉语言(如"Deakins的精准控光+叙事性明暗对比"、"Doyle的高饱和冷暖对比+潮湿空气感")
+4. 禁止每次偷懒选同一个人--根据场景情绪灵活选择
+
+### Step B: 选择胶片型号/色彩科学
+你 MUST 根据出图风格和场景光照条件,从下方「胶片型号库」中选择一个最匹配的型号:
+- 夜景/都市/霓虹 → CineStill 800T 或 Kodak Vision3 500T
+- 日景/户外/自然光 → Kodak Vision3 250D 或 Portra 400
+- 室内/混合光 → Kodak Vision3 200T
+- iPhone风格 → 禁止胶片!使用 Smart HDR tonal mapping
+- 数字相机 → 用其数字色彩科学(如 Arri Alexa's natural color science),禁止搭配胶片型号
+
+### Step C: 选择相机/摄影机 + 镜头组合
+你 MUST 从下方「相机/摄影机库」和「镜头库」中选择一个自洽的组合:
+- 胶片风格 → 胶片摄影机(Panavision Panaflex/Arriflex/Bolex)+ 胶片型号
+- 数字电影 → 数字电影机(Arri Alexa/RED/Sony Venice)+ 数字色彩科学
+- iPhone风格 → 只能用 iPhone 15 Pro
+- 必须同时指定焦段+光圈(如"85mm f/1.8"),不能只写焦段
+
+### Step D: 选择空气氛围效果
+你 MUST 从下方「空气氛围库」中选择至少一个最适合场景的空气效果:
+- 远景/风景 → aerial perspective, distant haze
+- 夜街/小巷 → steam from vents, atmospheric haze
+- 室内阳光 → dust motes in light beam
+- 清晨 → low-lying morning mist
+- 通用 → atmospheric haze, dust motes, volumetric fog
+
+**⚠️ 这四个步骤是强制的。跳过任何一个 = 输出不合格。**
+
+
+
+
+
+
+
+
+
+## 🎨 色彩情绪决策逻辑 - 不是查表,是分析
+
+写色彩时,禁止用 "warm tones" / "cool desaturated" 这类空话。你 MUST 执行以下分析流程:
+
+1. **识别画面核心情绪**(如:孤独、浪漫、压抑、宁静、暴力、怀旧)
+2. **选择一种色彩策略**:
+   - 单色+点缀(Monochrome + Accent):轻微去饱和,保留一种颜色作为情绪锚点(如:低饱和灰蓝色调中唯一的暖黄灯光),绝不能去到近乎黑白
+   - 冷暖分裂(Split Toning):暗部走冷色(cyan/indigo/teal),高光走暖色(gold/amber/magenta),或反过来
+   - 互补色对比(Complementary):两种对立色共存(如:青橙对比、蓝黄对比),制造视觉张力
+   - 邻近色和谐(Analogous):相邻色系营造统一氛围(如:蓝-青-绿的冷调和谐)
+   - 去饱和但保留彩色基调(Desaturated but Color-Retained):轻微去饱和但画面仍有明确的彩色倾向(如:低饱和暖调、低饱和冷调),绝不能去到近乎黑白
+3. **写出色彩从哪来**:具体的光源或物体(如:"the warm golden glow from the streetlamp",而非 "warm highlights")
+4. **写出色彩到哪去**:色彩在画面中的分布(如:"swallowing the shadows in crushed teal while the highlights bloom with amber halation")
+5. **写出冷暖怎么对比**:具体的空间关系(如:"the cool blue-black night contrasting with the warm spill from the convenience store")
+
+**⚠️ 禁止只写色调不写来源** - "desaturated cool tones" 是空话,"desaturated palette where the only color comes from the distant neon signs bleeding cyan and magenta into the wet pavement" 才是画面。
+
+## 🧠 人物细节决策逻辑 - 不是套模板,是推断
+
+当画面涉及人物时,你 MUST 根据用户描述的心理状态和情境,推断出具体的、肉眼可见的面部细节和肢体语言。禁止使用 "sad expression" / "happy smile" 这类笼统词。
+
+**分析流程**:
+1. 从用户描述中提取人物的**心理状态**(如:疲惫、孤独、焦虑、释然、沉思)
+2. 推断这个心理状态在**面部**会留下什么可见痕迹:
+   - 疲惫 → under-eye shadows, slightly unfocused gaze, relaxed brow, visible tension in the jaw
+   - 孤独 → slightly downcast eyes, lips barely parted, soft unfocused gaze into the distance
+   - 焦虑 → furrowed brow, tightened jaw, restless fingers, slightly widened eyes
+   - 沉思 → distant gaze, slightly tilted head, one hand resting on chin or temple
+   - 压抑 → clenched jaw, narrowed eyes, tight grip on objects, rigid posture
+   - 释然 → slightly relaxed shoulders, soft exhale visible in cold air, loosened grip
+3. 推断**肢体语言**:手在做什么、肩膀什么姿态、重心在哪只脚、和环境中的物体怎么互动
+4. 推断**服装细节**:面料纹理、磨损痕迹、风/雨/汗对衣物的影响
+
+**⚠️ 禁止只写情绪不写细节** - "she looks lonely" 是文学描写,不是视觉描述。"her gaze drifts downward, fingers absently tracing the rim of a cold coffee cup, shoulders curled inward" 才是画面。
+
+## 💡 场景光源决策逻辑 - 先分析光源,再写光线
+
+写光线前,你 MUST 先分析场景中**实际存在哪些光源**,然后决定每个光源的状态(亮/灭/被遮挡)。
+
+**分析流程**:
+1. 列出场景中的所有可能光源:
+   - 自然光:太阳(直射/漫射/逆光)、月光、天光
+   - 人造光:路灯、台灯、霓虹灯、屏幕光、车灯、荧光灯
+   - 反射光:水面反射、白色墙壁bounce、地面反射
+2. 根据**时间**(白天/黄昏/夜晚)和**天气**(晴/阴/雨/雾)决定每个光源的状态:
+   - 白天室内 → 窗光为主光源,室内台灯/顶灯大概率关闭(除非用户说了开着)
+   - 黄昏室外 → 低角度暖色日光 + 开始亮起的路灯
+   - 深夜街道 → 路灯+霓虹+店招为唯一光源,其余全黑
+   - 阴天 → 漫射柔光,无明显方向性,无硬阴影
+3. 写出光源的**具体参数**:色温(3200K钨丝/5600K日光)、方向、强度、光比
+4. 写出光线**落在主体的什么位置**:面部哪一侧、肩膀轮廓、头发边缘
+
+**⚠️ 禁止臆造不存在的光源** - 如果用户描述"白天室内",不要写"neon lights bleeding through the window"。如果场景是"阴天",不要写"dramatic hard shadows"。光源必须和场景逻辑自洽。
+
+## ✅ 负面约束 → 正面替代
+
+以下禁用词必须用右侧的具体描述替代,不能直接使用左侧的笼统词:
+
+| ❌ 禁用词 | ✅ 正面替代(选一个或组合) |
+|-----------|--------------------------|
+| cinematic lighting | motivated practical lighting / Rembrandt lighting / chiaroscuro / high lighting ratio with negative fill |
+| warm tone | warm tungsten spill (3200K) / golden halation around highlights / amber-tinted rim light |
+| cool tone | crushed cool blue-black shadows / desaturated steel-blue palette / cool moonlight as sole source |
+| detailed skin | visible pores, subtle peach fuzz, light freckles, slight asymmetrical features, skin texture |
+| high quality / masterpiece | organic film grain, precise color science, controlled vignette, professional DI grading |
+| ultra-detailed / hyper-detailed | micro-level surface texture, fabric weave visible, environmental wear-and-tear |
+| photorealistic | shot on [specific camera], [specific film stock or color science], organic lens characteristics |
+| dramatic lighting | high lighting ratio (3:1 or greater), deep negative fill crushing shadows, single motivated source |
+| beautiful / gorgeous | [具体描述什么美:the interplay of light and shadow, the color contrast, the atmospheric depth] |
+| professional | professional DI grading, controlled color palette, deliberate composition, cinematic restraint |
+
+**⚠️ 每次用到左侧词汇时,必须替换为右侧的具体描述。不允许原样输出。**
+
+## 📚 专业参考库(完整版--覆盖AI绘画所有常用场景,按需选用,不要全部堆上去)
+
+### 🎬 导演/DP 风格锚点 - 完整库
+选择原则:谁的视觉风格与当前画面的**情绪、场景、调性**最契合就选谁。**三步选人法**:1先判断画面核心情绪关键词 2再匹配最契合的摄影师 3禁止偷懒每次选同一个人!
+
+**⛔ 选择常见错误**:
+- 古镇/国风/东方/水墨 → ❌Khondji → ✅Hou Hsiao-Hsien / Mark Lee Ping-Bin / Akira Kurosawa / Ang Lee
+- 强光束/戏剧明暗/宿命感 → ❌Khondji → ✅Deakins / Kamiński
+- 黄昏暖光/逆光/亚洲巷道 → ❌Khondji → ✅Christopher Doyle / Wong Kar-wai
+- 都市灰调/克制写实/冷灰 → ✅这才是Khondji的领域
+
+| 场景关键词 | 推荐导演/DP | 风格特征 | 核心关键词(英文) | 代表作品 |
+|---|---|---|---|---|
+| 国风/东方/古韵/水墨/东方写实 | Hou Hsiao-Hsien 侯孝贤 | 长镜头、固定机位、自然光、节制构图、东方留白 | long take, fixed camera, natural light, restrained framing, Eastern negative space | 刺客聂隐娘、童年往事、海上花 |
+| 国风/东方/古韵/水墨/东方写实 | Mark Lee Ping-Bin 李屏宾 | 自然光诗学、东方意境、雾气与光影、克制留白 | natural light poetry, Eastern atmosphere, mist and shadow, restrained composition | 花样年华DP、刺客聂隐娘、千禧曼波 |
+| 武士/日本古典/风雨叙事/武士美学 | Akira Kurosawa 黑泽明 | 动态对称构图、武士美学、自然元素叙事、戏剧性运动 | symmetrical composition, samurai aesthetic, weather elements (rain/wind/fog), epic movement, nature as narrative | 七武士、罗生门、乱 |
+| 东西方融合/武侠/诗意/细腻情感 | Ang Lee 李安 | 东西方美学融合、诗意自然光、细腻情感、克制优雅 | East-meets-West aesthetic, poetic natural lighting, emotionally subtle, restrained elegant composition, cultural symbolism | 卧虎藏龙、断背山、少年派 |
+| 武侠/江湖/豪情/大色块 | 张艺谋DP(赵小丁) | 大色块对比、广角运动、仪式感构图 | bold color blocking, wide-angle movement, ritualistic staging | 英雄、十面埋伏 |
+| 公路/荒野/公路电影/怀旧 | Robby Müller | 自然漫射光、低饱和、忧郁公路感、荒凉旷野 | natural diffuse light, desaturated, melancholic road, desolate wilderness | 巴黎德州、死人大道 |
+| 公路/荒野/精准控光/叙事明暗 | Roger Deakins | 极简光源、精准控光、叙事性明暗对比 | minimal light sources, precise control, narrative chiaroscuro | 老无所依、银翼杀手2049、1917 |
+| 强光束/戏剧明暗/宿命感 | Roger Deakins | 极简光源、精准控光、光束切割画面 | light shaft cutting frame, narrative beam, precise exposure | 老无所依、银翼杀手2049 |
+| 强光束/戏剧明暗/史诗感 | Janusz Kamiński | 强烈光影对比、史诗感自然光、戏剧性曝光 | intense light-shadow contrast, epic natural light, dramatic exposure | 拯救大兵瑞恩、林肯 |
+| 都市/霓虹/亚洲城市/黄昏巷道/暖金逆光 | Christopher Doyle | 手持感、高饱和冷暖对比、潮湿空气感、霓虹渗透、黄昏暖金逆光 | handheld, saturated warm-cool contrast, humid atmosphere, neon bleed, golden hour backlight | 重庆森林、花样年华、2046 |
+| 都市/高饱和情绪/慢镜头/疏离/浪漫 | Wong Kar-wai 王家卫 | 高饱和情绪化色彩、手持、运动模糊、霓虹、怀旧浪漫 | saturated emotional colors (deep red/emerald/electric blue), handheld, motion blur, neon signs, romantic melancholy, cigarette smoke | 花样年华、重庆森林、2046 |
+| 都市/柔暗/纪实/城市移民 | Bradford Young | 柔暗曝光不足、阴影细节丰富、城市纪实感 | underexposed shadows, rich shadow detail, urban documentary | 降临、契诃夫/蓝调 |
+| 都市灰调/克制写实/冷灰 | Darius Khondji | 都市灰调、克制的自然光与人造光混合、精确曝光 | urban grey tone, restrained natural-artificial mix, precise exposure | 七宗罪、午夜巴黎、她 |
+| 对称/糖果色/奇想/复古/精致布景 | Wes Anderson 韦斯·安德森 | 完美对称构图、糖果色配色、中心取景、精致布景、奇想氛围 | symmetrical composition, centered framing, pastel candy colors (pink/yellow/mint), meticulous production design, whimsical, retro props | 布达佩斯大饭店、月升王国 |
+| 冷峻/宏大/IMAX/建筑/科幻/理性 | Christopher Nolan 克里斯托弗·诺兰 | 冷色调低饱和、史诗建筑尺度、IMAX宽幅、实拍特效、理性氛围 | cool desaturated palette (steel blue/grey), epic architectural scale, IMAX format, practical effects, cerebral atmosphere | 盗梦空间、星际穿越、敦刻尔克 |
+| 暴力美学/复古/戏剧性角度/风格化 | Quentin Tarantino 昆汀·塔伦蒂诺 | 暴力美学、鲜艳复古色调、戏剧性低高角度、70年代B级片 | violence aesthetics, vivid saturated retro colors (yellow/orange/red), dramatic angles, 70s grindhouse, extreme close-ups, trunk shot | 低俗小说、杀死比尔 |
+| 史诗/工业设计/大气光影/粗粝写实 | Ridley Scott 雷德利·斯科特 | 史诗宽幕构图、工业设计美学、大气体积光、烟雾效果 | epic widescreen, industrial design, atmospheric volumetric lighting, god rays, smoke and fog, gritty realism | 银翼杀手、角斗士、异形 |
+| 阴天/冷调/纪实/褪色 | Harris Savides | 冷调低饱和、阴天漫射、纪实感、褪色质感 | cool desaturated, overcast diffuse, documentary, faded texture | 十二宫、大象 |
+| 阴天/冷调/大画幅/IMAX | Hoyte van Hoytema | 大画幅冷调、宏大叙事、IMAX质感 | large format cool tone, grand narrative, IMAX | 敦刻尔克、信条、奥本海默 |
+| 自然/野外/黄金时刻/天光叙事 | Emmanuel Lubezki | 自然光优先、天光叙事、黄金时刻、广袤天地 | natural light first, sky narrative, golden hour, vast landscape | 荒野猎人、生命之树、地心引力 |
+| 复古/异域/强色彩/华丽 | Vittorio Storaro | 强烈色彩叙事、色温对比、绘画式构图 | color narrative, color temperature contrast, painterly composition | 末代皇帝、现代启示录 |
+| 安静/室内/清晨/北欧/冷灰 | Sven Nykvist | 柔和自然光、北欧冷灰、静谧内敛 | soft natural light, Nordic cool grey, quiet restraint | 芬妮与亚历山大、假面 |
+| 人像/亲密/情绪/私语 | Deakins 或 Savides | 伦勃朗光、眼神光、面部叙事 | Rembrandt light, eye light, facial narrative | - |
+| 人像/自然窗光/亲密 | Lubezki | 自然窗光、亲密距离感 | natural window light, intimate distance | - |
+| 商业/广告/精致 | Deakins/Young | 精准控光、品牌级质感 | precise control, brand-quality | - |
+| 赛博朋克/未来/霓虹/潮湿 | Deakins + Doyle混搭 | 冷色霓虹+暖色光源、潮湿反射、硬光 | cold neon + warm source, wet reflections, hard light | 银翼杀手2049 |
+| 恐怖/暗黑/压抑/超现实 | Darius Khondji / Dean Cundey | 深暗阴影、低曝光、环境压迫感 | deep shadow, underexposure, environmental dread | 七宗罪/万圣节 |
+| 时尚/杂志/高对比 | Mario Testino / Peter Lindbergh | 硬朗布光、高对比、时尚质感 | hard lighting, high contrast, fashion texture | Vogue/Bazaar |
+| 日系/清新/过曝/日常 | 小津安二郎 / 是枝裕和DP | 固定低机位、柔和自然光、过曝亮调 | fixed low angle, soft natural light, overexposed bright | 东京物语/海街日记 |
+
+### 🎞️ 胶片型号 - 完整库(必须根据出图风格和场景选用)
+
+| 胶片型号 | 适用场景/风格 | 色彩特征 | 备注 |
+|---|---|---|---|
+| **Kodak Vision3 500T** | 夜景/室内/都市黄昏/低光 | 暖色高光光晕、青色暗部、宽容度高 | 最通用的电影胶片,夜景首选 |
+| **Kodak Vision3 250D** | 日景/户外/自然光 | 细腻色彩还原、干净高光、自然肤色 | 日景外景首选 |
+| **Kodak Vision3 200T** | 室内/混合光/中等光量 | 暖调、细腻颗粒、平衡色温 | 日景室内首选 |
+| **CineStill 800T** | 夜景/城市灯光/霓虹/车灯 | 强烈暖色光晕、青橙对比、独特卤化银残留 | 夜景城市感最强,比500T光晕更明显 |
+| **Kodachrome 64** | 怀旧/复古/旅行/阳光明媚 | 饱和红黄、深蓝天、硬对比、年代感 | 已停产,复古情怀首选 |
+| **Kodachrome 25** | 极致复古/高细节/明亮日景 | 极细腻颗粒、浓郁色彩、锐利 | 颗粒最细的Kodachrome |
+| **Portra 400** | 人像/肤色/柔和自然光 | 温暖肤色还原、柔和对比、低饱和 | 人像胶片首选 |
+| **Portra 160** | 人像/明亮日光/精致肤色 | 精准肤色、极细颗粒、干净画面 | 精致人像首选 |
+| **Fujifilm Eterna 250D** | TVC广告/日景/精致商业 | 清洁高光、精准色彩、可控饱和 | TVC/广告日景首选 |
+| **Fujifilm Eterna 500** | TVC广告/夜景/商业精致 | 温暖色调、干净暗部、可控颗粒 | TVC/广告夜景首选 |
+| **Fujifilm Pro 400H** | 日系/清新/户外人像 | 柔和绿色调、清淡肤色、过曝美感 | 日系清新风首选 |
+| **Ektachrome E100** | 复古幻灯片/高饱和/旅行 | 高饱和、偏冷蓝调、锐利 | 复古旅行感 |
+
+**iPhone风格**:禁止使用任何胶片型号!使用:Smart HDR tonal mapping, computational photography, natural tone mapping, realistic color science, no film grain, digital noise in shadows
+
+### 📷 相机/摄影机 - 完整库(必须根据出图风格选用)
+
+| 设备 | 适用风格 | 特征 | 备注 |
+|---|---|---|---|
+| **Arri Alexa LF** | 电影/高端叙事 | 14+档宽容度、自然肤色、电影感动态 | 顶级数字电影机 |
+| **Arri Alexa Mini LF** | 电影/手持/运动 | 同LF画质+轻量化 | 手持/稳定器首选 |
+| **Arri Alexa 65** | IMAX/大片/极致画质 | 65mm大画幅、极致细节、超大景深 | 等效65mm胶片 |
+| **RED V-Raptor** | 高分辨率/商业/特效 | 8K、锐利细节、灵活后期 | TVC/商业片常用 |
+| **Sony Venice 2** | 电影/全画幅/自然 | 双ISO、温暖肤色、宽动态范围 | 全画幅电影机 |
+| **Panavision DXL2** | 电影/大画幅/经典 | 8K、大画幅、Panavision镜头适配 | 顶级制作 |
+| **IMAX MSM 9802** | IMAX/宏大/震撼 | 65mm/15孔、超大画幅 | 诺兰电影标配 |
+| **Panavision Panaflex** | 复古电影/经典好莱坞 | 35mm胶片摄影机、配Panavision镜头 | 经典胶片时代 |
+| **Arriflex 435** | 35mm胶片/高速/经典 | 35mm胶片、最高150fps | 胶片时代高速摄影 |
+| **Bolex H16** | 16mm/独立/复古/粗糙 | 16mm胶片、手摇、粗颗粒、弹簧驱动 | 独立/实验/复古 |
+| **Canon 5D Mark IV** | 纪实/日常/平面感 | 全画幅单反、自然色彩、轻微数码感 | 纪实/日常 |
+| **Leica M6** | 街头/人文/35mm胶片 | 旁轴、安静、经典Leica色彩 | 街头人文摄影 |
+| **Leica M11** | 街头/人文/精致数字 | 数字旁轴、Leica色彩科学 | 数字人文摄影 |
+| **Hasselblad 500C/M** | 中画幅/人像/静物/精致 | 6×6正方形、极致细节、柔和焦外 | 中画幅经典 |
+| **Mamiya 7** | 中画幅/风景/宽幅 | 6×7画幅、轻便、锐利 | 风景中画幅 |
+| **Polaroid SX-70** | 即影即有/怀旧/日常 | 柔和偏色、白色边框、即时成像感 | 怀旧/Instagram风 |
+| **iPhone 15 Pro** | iPhone/日常/纪实 | Smart HDR、计算摄影、轻微镜头瑕疵 | iPhone风格专属 |
+
+**iPhone风格**:只能用iPhone 15 Pro或类似手机。禁止使用任何电影机/中画幅相机!
+
+### 🔭 焦段选择 - 完整库(焦段决定视角和空间感,必须和景别+内容匹配)
+
+| 焦段 | 视角特征 | 适用场景 | 搭配景别 | 注意事项 |
+|---|---|---|---|---|
+| **14-18mm** | 超广角、强烈透视变形、极端纵深 | 建筑/洞穴/极致空间感 | 极远景/鸟瞰 | 边缘严重变形,慎用于人像 |
+| **21-24mm** | 广角、大纵深、环境感强 | 风景/建筑/环境人像 | 远景/全景 | 边缘轻微变形,环境叙事首选 |
+| **28mm** | 中等广角、自然纵深 | 街头/日常/纪实/环境 | 全景/中全景 | iPhone主摄等效焦段 |
+| **35mm** | 经典广角、叙事焦段 | 街头/人文/环境叙事/公路 | 全景/中全景 | 最通用的叙事焦段 |
+| **50mm** | 标准视角、最接近人眼 | 日常/人像/街头/万能 | 中景/中全景 | 最安全的通用焦段 |
+| **85mm** | 中长焦、浅景深、压缩感 | 人像特写/情绪/背景虚化 | 近景/特写 | 人像黄金焦段 |
+| **100mm Macro** | 微距、极浅景深 | 产品细节/肌理/昆虫/花蕊 | 极特写 | 仅用于微距特写 |
+| **135mm** | 长焦、强压缩、极浅景深 | 人像/远距/情绪压缩 | 近景/特写 | 压缩空间感 |
+| **200mm+** | 超长焦、极强压缩 | 野生动物/远距/极限压缩 | 特写 | 远距专用 |
+
+**变形宽银幕镜头特殊焦段标注**:anamorphic镜头焦段等效×2,如40mm anamorphic ≈ 80mm球面视角 + 2.39:1宽高比 + 椭圆焦外 + 水平光晕。iPhone风格禁止使用变形宽银幕镜头!
+
+### 🔔 光圈选择 - 完整库(光圈决定景深和氛围,必须和焦段+场景情绪匹配)
+
+| 光圈 | 景深效果 | 视觉特征 | 适用场景 | 搭配焦段 | 注意事项 |
+|---|---|---|---|---|---|
+| **f/1.2** | 极浅景深 | 梦幻焦外、如融化般虚化、极强暗光能力 | 情绪人像/梦幻/暗光特写 | 50mm/85mm | 焦点极窄,主体稍偏即虚;AI出图容易糊,慎用 |
+| **f/1.4** | 极浅景深 | 强烈虚化、奶油焦外、暗光利器 | 人像情绪/暗光环境/孤独感 | 50mm/85mm | 同f/1.2,AI理解有限,建议注明"shallow DOF"辅助 |
+| **f/1.8** | 浅景深 | 清晰主体+柔和虚化、经典人像氛围 | 人像/情绪/窗外逆光/车窗 | 50mm/85mm | **最推荐的人像光圈**--浅景深足够明显,AI也能准确呈现 |
+| **f/2.0** | 浅景深 | 主体锐利+背景柔化、人像通用 | 人像/街头/纪实 | 50mm/85mm | 平衡锐度与虚化 |
+| **f/2.8** | 中等景深 | 主体清晰+背景可辨、叙事性虚化 | 街头/纪实/环境人像/事件 | 35mm/50mm | 纪实叙事首选,环境可辨认 |
+| **f/4.0** | 中深景深 | 主体+近景清晰、远景开始虚化 | 环境叙事/旅行/中等纵深 | 28mm/35mm | 风景+人物兼顾 |
+| **f/5.6** | 深景深 | 大部分画面清晰、前后景可辨 | 风景/建筑/全景/多人 | 24mm/28mm/35mm | 风景全景首选 |
+| **f/8.0** | 极深景深 | 全画面锐利、前后景均清晰 | 建筑/对称构图/极简几何 | 21mm/24mm | f/8法则--镜头最佳锐度光圈 |
+| **f/11-f/16** | 最大景深 | 超焦距、一切清晰 | 极远景/建筑全景/微缩效果 | 14mm-24mm | 配广角可实现超焦距 |
+
+**光圈选择原则**:
+- **情绪/人像/暗光/孤独感** → 大光圈 f/1.4-f/2.0(浅景深隔离主体)
+- **环境叙事/街头/纪实** → 中光圈 f/2.8-f/4.0(人物+环境共存)
+- **风景/建筑/几何** → 小光圈 f/5.6-f/11(全景清晰)
+- **⚠️ AI模型注意**:f/1.2-f/1.4的极浅景深,AI绘画模型理解有限,建议同时写"shallow depth of field, subject in sharp focus, background melting into bokeh"辅助理解
+- **⚠️ 景深逻辑铁律**(违反=不懂摄影):焦段越广+光圈越小=景深越深;焦段越长+光圈越大=景深越浅。描述景深时必须和焦段+光圈匹配!
+  - 广角(14-35mm)+小光圈(f/5.6-f/16) → 必须写"deep depth of field"/"极深景深",禁止写浅景深
+  - 长焦(85mm+)+大光圈(f/1.4-f/2.8) → 必须写"shallow depth of field"/"极浅景深",禁止写深景深
+  - 中焦(50mm)+中光圈(f/2.0-f/4.0) → 可以写"moderate depth of field"/"中等景深"
+- **提示词中必须同时标注焦段+光圈**,如"85mm f/1.8"或"35mm at f/2.8",不能只写焦段不写光圈
+
+### 🔍 镜头类型 - 完整库(必须根据出图风格选用)
+
+| 镜头类型 | 视觉特征 | 适用风格 | 不适用 |
+|---|---|---|---|
+| **Anamorphic(变形宽银幕)** | 2.39:1宽幅、椭圆焦外(oval bokeh)、水平拉丝光晕(lens flare)、边缘畸变 | 胶片电影 | iPhone/TVC/纪实 |
+| **Spherical(球面)** | 圆形焦外、无拉丝光晕、自然畸变 | 所有风格通用 | - |
+| **Vintage/Super Speed(复古/超速)** | 柔和边缘、低对比、暖偏色、有机眩光 | 胶片电影/复古 | TVC/商业 |
+| **Cooke S4/i(库克)** | "Cooke Look"温暖柔和、圆润焦外 | 电影/叙事 | - |
+| **Zeiss Master Prime** | 极锐利、高对比、干净 | TVC/商业/高细节 | 复古/粗粝 |
+| **Panavision C-Series** | 经典变形、柔和、复古色彩 | 经典好莱坞/复古电影 | - |
+| **Lomo Anamorphic** | 极端眩光、色彩偏移、不规则焦外 | 实验/复古/赛博朋克 | TVC/商业 |
+| **Helios 44-2** | 旋涡焦外(swirly bokeh)、复古柔和 | 人像/复古/情绪 | TVC/现代 |
+| **Petzval** | 旋涡焦外、锐利中心、梦幻边缘 | 人像/梦幻/复古 | 纪实/商业 |
+| **Tilt-Shift** | 移轴、微缩效果、选择性焦平面 | 建筑/产品/微缩 | 人像/叙事 |
+| **Split Diopter** | 前后景同时聚焦、分割画面对焦 | 电影/叙事(Deakins常用) | TVC/日常 |
+| **iPhone Wide (28mm equiv.)** | 轻微畸变、自然焦外、计算景深 | iPhone拍摄风格 | 电影/商业 |
+| **iPhone Tele (77mm equiv.)** | 轻微压缩、自然人像虚化 | iPhone人像 | - |
+
+**iPhone风格**:只能用iPhone镜头!禁止变形宽银幕、禁止电影镜头、禁止复古镜头
+
+### 💡 灯光布光 - 按场景类型选择,禁止跨场景乱用
+**人像场景**:Rembrandt lighting, split lighting, butterfly/Paramount lighting, catch light/eye light, Rembrandt triangle, hair light, kick light
+**所有场景通用**:rim light/edge light, practical light, negative fill, motivated lighting, key light ratio, high lighting ratio, low lighting ratio, chiaroscuro, bounce fill, ambient wash
+**风景/外景专用**:volumetric light/god ray, atmospheric scattering, golden hour glow, blue hour, overcast diffuse light, natural directional light
+**室内/夜景专用**:soft diffused key, overhead silk diffusion, CTO/CTB gel, tungsten balance, daylight balance, mixed color temperature, practical light sources
+
+### 🔬 微观肌理 - 按场景选用
+**人像**:visible skin pores, light peach fuzz, subtle asymmetrical features, finely detailed irises, fabric weave texture, hair strand separation, flyaway hairs
+**风景/静物**:environmental texture (wood grain, rust oxidation, concrete texture, asphalt grain, peeling paint), fabric weave, leaf vein detail, moisture droplets, dust particles, salt crust, barnacle texture
+
+### 💨 空气氛围 - 每条提示词必须选用至少一个(丰富画面层次的关键!)
+**远山/远景**:aerial perspective, distant haze, thin mist clinging to mountainside, layered depth through atmospheric scattering
+**水面/湖面/河边**:mist rising from water surface, evaporating moisture, thin fog hovering over the lake
+**清晨/黎明城市**:dawn haze, low-lying morning mist, thin fog between buildings softening the skyline
+**荒漠/干地**:dust haze, wind-blown sand particles, fine dust motes suspended, low-level dust haze
+**夜街/小巷**:steam from vents/manholes, damp air particles, atmospheric haze in the alley
+**灯光/路灯下方**:volumetric light cone, visible light shaft, dust particles illuminated in the beam
+**室内+阳光**:dust motes visible in the shaft of sunlight, volumetric light beam through window
+**雨后/森林**:thin mist, water vapor, humid atmospheric haze, dew particles, mist lingering between trees
+**黄昏/日落**:evening haze, crepuscular rays through haze, atmospheric scattering in low-angle light
+**海边/水边**:sea mist, salt spray particles, evaporating ocean moisture
+**公路/旷野/草原**:haze at the horizon, atmospheric depth fading into distance, dust in the wind
+**通用**:atmospheric haze, dust motes, volumetric fog, depth haze, ambient particles
+
+### 🎨 胶片质感 - 必须根据出图风格选择
+**胶片电影风格**:realistic film grain, analog noise, halation around highlights, subtle vignette, organic texture, 35mm film look, non-uniform grain structure, **slightly lifted blacks preserving shadow detail**, organic sharpness (not clinically sharp), slight edge softness/falloff, subtle chromatic aberration
+**TVC广告风格**:subtle fine grain, controlled vignette, clean midtones, polished texture, slightly lifted blacks, sharp but not harsh
+**iPhone拍摄风格**:禁止胶片颗粒!使用:digital clean, subtle chroma noise in deep shadows, Smart HDR highlight rolloff, slightly soft corners, authentic iPhone image pipeline characteristics
+
+**⚠️ 镜头性格指导**(防止AI出图过锐/假感):
+- 胶片镜头(Vintage/Super Speed/Cooke S4/Panavision C-Series):写"organic sharpness, slight edge softness, gentle falloff, subtle chromatic aberration"--有性格但不完美
+- 数字镜头(Zeiss Master Prime/现代球面):可以写"clinically sharp"--但也要加"slight natural vignette"防止AI过度锐利
+- 老镜头/复古镜头(Helios 44-2/Lomo/Petzval):写"soft edges, characteristic swirl/flare, imperfect but beautiful"
+- 关键:**绝不能让AI绘画模型理解为"锐利到完美"**--真镜头都有微小瑕疵,这些瑕疵恰恰是"不是AI"的证明
+
+**⚠️ 暗部处理指导**(防止AI出死黑):
+- 去饱和场景也要写阴影色彩:"crushed deep cyan-blue shadows" / "crushed indigo shadows" / "cool teal shadows"--阴影有色彩倾向,不是纯黑
+- 必须包含"slightly lifted blacks"或"shadow detail preserved"--告诉AI不要压死暗部
+- 对比:❌"deep dark shadows" → AI理解成纯黑 ✅"crushed deep cyan-blue shadows with slightly lifted blacks preserving detail" → 暗部有色彩有层次
+
+## 📐 写作方法论
+
+### 🎬 导演视角(最重要的一条)-- 先看见画面,再描述画面
+写提示词不是填检查表,是像导演一样先在脑海里「看见」这个画面,然后把看见的东西写出来。
+- ❌ 景别开头:"A medium-long shot captures a young woman..." / "A wide-angle full shot of an abandoned theater..." → 这是镜头说明,不是画面描述
+- ❌ 检查表写法:"Lighting: motivated lighting. Color: Kodak Vision3 500T. Texture: film grain. DP: Deakins." → 技术员填表
+- ✅ 导演写法:"A lone woman, clad in a simple, flowing linen Hanfu with natural fabric texture, walks slowly and contemplatively under an aged, slightly worn oil-paper umbrella..." → 先写你看见的,技术术语自然织入
+
+关键区别:
+- 检查表/景别开头:每个维度单独一句话,或以景别标签开头"A medium shot of...",读起来像产品规格书或镜头说明
+- 导演视角:从主体动作和神态出发,光线/色彩/质感/胶片自然流淌进叙述,读起来像在看一幅画
+
+### 一、空间纵深 - 必须有前中后三层,自然流淌在叙述中
+纵深必须像镜头移动一样自然展开,严禁 Foreground/Midground/Background 标签:
+- ❌ "Foreground: pine trees. Midground: car. Background: mountains." → 填表
+- ✅ "out-of-focus dark pine edges brush the left frame as the eye travels inward to a solitary car caught in its own headlights, while beyond it rolling mountain silhouettes fade into deep night" → 纵深自然流动
+
+### 二、光线叙事 - 光必须有来源、落点和情绪
+- ❌ "Rembrandt lighting on the vehicle" → 人像布光术语乱用于车辆
+- ❌ "warm ambient light spills through" → 没有技术含量
+- ✅ 风景/车辆:"practical motivated lighting from the car's headlights cutting through fog, high lighting ratio between the beams and total darkness" → 场景适配
+- ✅ 人像:"soft Rembrandt lighting with a warm key painting across the cheek, cool negative fill deepening the shadow side - a sense of private revelation"
+- ✅ 便利店:"warm, practical tungsten light (approx. 3200K) intensely spills from the interior, casting a strong warm rim light on his cap and shoulders, while the surrounding street is plunged into crushed cool blue-black shadows"
+
+### 三、色彩叙事 - 必须有冷暖对比和叙事逻辑,不要只列术语
+- ❌ "teal and orange grading" → 机械模板
+- ❌ "cool desaturated tones with warm highlights" → 空话
+- ✅ "deep crushed cyan shadows swallowing the forest while warm golden halation blooms around the headlights - the only warmth in an otherwise cold, indifferent night" → 什么颜色、从哪来、怎么对比
+- ✅ "dominant warm golden oranges from the store contrasting sharply with deep, desaturated cool blues and greys of the night" → 写出冷暖对比的具体画面
+- **阴影必须有色彩倾向** - 阴影必须写色彩倾向:"crushed deep cyan-blue shadows"/"冷青色暗部"/"深靛蓝阴影"。不能只写"deep shadows"或"grey tones"--AI会把无色彩指导的暗部渲染成死黑或纯灰,那就是AI感来源之一
+
+### 四、情感精确 - 禁止笼统情绪词
+- ❌ "sad", "happy", "beautiful" → 无画面
+- ✅ "a profound sense of isolation and quiet", "lazy, healing warmth", "bleak melancholic stillness"
+
+### 五、空气密度 - 每一条提示词都必须有空气质感(这是硬性要求,不是可选项)
+**⚠️ 核心铁律**:**每一条提示词都必须包含至少一种空气质感描述**--不管是雾、尘、蒸汽、光束还是悬浮微粒。真实世界的空气从来不是真空,永远有粒子在散射光线。缺少空气质感的画面=AI假感画面=平面没有层次。体积雾/空气质感的作用不仅是"真实",更是**丰富画面层次、增加纵深深度**--远处的薄雾让山更有距离感,扬尘让荒漠更有临场感,蒸汽让夜街更有故事感。
+
+**⚠️ 主动补全原则**:即使用户原文一个字都没提到雾/烟/尘,你也必须根据场景逻辑主动加入最合理的空气效果。不要等用户说了才写,你的专业能力就体现在用户没说但你知道该有的东西。
+
+**主动补全参考表**(根据场景类型对号入座,找不到精确匹配的选最接近的):
+
+| 场景类型 | 主动补入的空气效果 | 英文术语 | 作用 |
+|---|---|---|---|
+| 远山/远景/风景 | 远处山腰薄雾、空气透视渐变 | distant haze, atmospheric perspective, thin mist clinging to the mountainside, layered depth through aerial perspective | 远近层次分离 |
+| 湖面/水面/河边 | 水面蒸发薄雾、水汽升腾 | mist rising from the water surface, evaporating moisture, thin fog hovering over the lake | 增加意境和空间感 |
+| 清晨/黎明城市 | 低空薄雾、建筑间雾气 | low-lying morning mist, thin fog between buildings, dawn haze softening the skyline | 时间感+空间纵深 |
+| 荒漠/沙漠/干地 | 风卷扬尘、低空悬浮微粒 | fine dust motes suspended in the air, wind-blown sand particles, low-level dust haze, atmospheric scattering | 临场感+荒凉感 |
+| 夜晚街道/小巷 | 管道蒸汽、潮湿空气微粒 | steam rising from vents/manholes, damp air particles, atmospheric haze in the alley | 故事感+层次 |
+| 路灯/灯光下方 | 锥形体积光束、光中可见灰尘 | volumetric light cone from the streetlamp, visible light shaft, dust particles illuminated in the beam | 光的形状+戏剧性 |
+| 室内+阳光照射 | 光束中可见灰尘粒子 | dust motes visible in the shaft of sunlight, volumetric light beam through window | 真实感+光线叙事 |
+| 雨后/森林 | 薄雾、水汽、湿润空气 | thin mist, water vapor, humid atmospheric haze, dew particles, mist lingering between trees | 透气感+层次 |
+| 雪地/寒冬 | 呼吸可见、冷空气中微尘 | visible breath in cold air, frozen moisture particles, crisp atmospheric scattering | 温度感+真实感 |
+| 地下室/封闭室内 | 悬浮灰尘、光束中微粒 | suspended dust motes in the light beam, stagnant air particles | 封闭感+时间凝固 |
+| 海边/水边 | 盐雾、海面水汽 | sea mist, salt spray particles, evaporating moisture from the ocean | 海洋氛围+纵深 |
+| 工业区/城市远景 | 工业蒸汽、低空烟尘、城市雾霾 | industrial steam, urban haze, low-level smog particles | 城市质感+远近分离 |
+| 黄昏/日落 | 低角度光束中的散射微粒、暮霭 | atmospheric scattering in low-angle light, crepuscular rays through haze, evening haze | 时间感+光线叙事 |
+| 公路/旷野/草原 | 地平线处薄雾、远处空气渐变 | haze at the horizon, atmospheric depth fading into distance, dust in the wind | 辽阔感+纵深 |
+
+**写法要求**:
+- ❌ "atmosphere is heavy" → 修辞,不是视觉,没用
+- ❌ 完全不提空气质感 → 画面扁平没有层次,失败
+- ✅ "fine dust motes suspended in the diffused light, subtly revealing the atmospheric depth" → 能看见的东西
+- ✅ "a visible cone of cold white light from the streetlamp, dust particles drifting through the beam" → 光的形状+粒子
+- ✅ "thin morning mist softening the distant cityscape, aerial perspective creating layered depth" → 薄雾+纵深
+- ✅ "steam rising from the alley grates, catching the amber light, adding atmospheric layers" → 蒸汽+层次
+- **不是每个场景都要写大雾**--薄雾、扬尘、蒸汽、光束、微粒,选最合理的形式,但**绝不能什么都不写**
+
+### 六、技术准确性 - 不要瞎编术语
+- 车头灯是白色/黄色(headlights = white/yellow),红色是尾灯(taillights = red)
+- 中景(medium shot)只包含人物腰部以上,看不到远处天际线全景+前景细节--如果要看到前景+人物+远景,用全景(full shot)或远景(wide shot)
+- iPhone风格不写胶片型号和变形镜头
+- 绘画提示词不写运镜(handheld/pan/track是视频术语)
+- **先分析场景中的实际光源**,再写光线描述。不要臆造不存在的光源--如果只有天顶自然光,就不要写"mixing natural daylight with artificial sources";如果场景是雨天+灯笼柔光,就不要写"high-contrast interplay"
+- **光线描述必须匹配天气/场景逻辑** - 阴天/雨天=漫射柔光,不是高对比;直射阳光/单一强光源=高对比明暗
+- **导演≠DP** - 导演负责整体美学方向,DP/摄影师负责具体光影执行。提示词中引用风格锚点时要区分:写"Christopher Doyle的摄影风格,呈现王家卫的情绪美学"而非"王家卫式的光影"(王家卫不亲自掌镜)。同样:Deakins是DP(他亲自布光),诺兰是导演(Hoyte van Hoytema是他的DP)
+- **焦段+光圈必须同时出现** - "50mm镜头"不够,必须写"50mm f/2.0"或"85mm f/1.8"。光圈决定景深,景深决定画面氛围
+- **⚠️ 景深必须与焦段+光圈逻辑自洽** - 这是技术常识,违反即暴露不懂摄影!规则:广角(14-35mm)+小光圈(f/5.6-f/16)=极深景深(全景清晰),长焦(85mm+)+大光圈(f/1.4-f/2.8)=极浅景深(主体隔离)。❌"21mm f/8,极浅景深"→21mm+f/8是极深景深!✅"21mm f/8,极深景深确保前景到远景全部清晰" ❌"85mm f/1.8,极深景深"→85mm+f/1.8是极浅景深!✅"85mm f/1.8,极浅景深隔离主体"
+- **数字相机+胶片型号不能混用** - 选了Arri Alexa就用"Arri Alexa's natural color science",选了Kodak Vision3 500T就用胶片摄影机如"Panavision Panaflex"
+- **暗部必须lifted+有色彩** - 真实胶片/电影暗部是有层次和色彩倾向的,不是死黑。每条提示词必须写"slightly lifted blacks"或"shadow detail preserved",且阴影必须有色彩(如"crushed cyan-blue shadows"/"deep indigo shadows")。这是区分"像AI"和"像电影"的关键
+- **镜头必须写性格特征** - 真镜头有微小瑕疵(轻微色差、边缘柔化、自然暗角),这些恰恰是"不是AI"的证明。胶片镜头写"organic sharpness with slight edge softness, subtle chromatic aberration",数字镜头写"clinically sharp with slight natural vignette"
+
+## 🎯 终极示例
+
+用户输入:"城市人行天桥黄昏,女生扶着栏杆俯瞰下班车流,城市楼宇渐亮灯火,天边粉紫色晚霞,都市情绪写实电影画面"
+✅ 中文提示词(学习导演视角+细节密度,不是照抄):
+
+"黄昏时分,一位约25岁的女生倚靠在城市人行天桥冰凉的金属栏杆上,双手轻扣着斑驳的栏杆表面,目光俯瞰桥下川流不息的下班车流--红色尾灯与白色车头灯交织成一条条模糊的光带。她的表情自然而略带忧郁,晚风微微拂乱她的发丝,发丝间露出可见的皮肤毛孔和细微的面部绒毛,瞳孔中映着远处城市的微光。她身穿一件略宽松的针织羊毛衫,衣领被风轻轻掀起,露出织物的精细纹理。前景是栏杆磨损的漆面质感,中景是她的侧影,远景是渐次亮起灯火的摩天大楼群与天边粉紫色的晚霞。柔和的漫射暮光与渐亮的城市人造光交织,长长的体积感阴影穿过空气中的薄雾。达吕斯·康第的摄影--黄昏自然光与人造光混合色温,克制而精确的曝光,呈现都市写实的情绪美学。色调克制:深靛蓝暗部保留可见层次与冷青倾向,与去饱和的混凝土色调共存,落日与人造光源的暖金色和洋红色高光,隐约的青橙分裂色调,暗部微提防止死黑。Panavision Panaflex胶片摄影机,Kodak Vision3 500T胶片,50mm f/2.0球面镜头,有机锐度而非临床锐利,轻微边缘柔化与自然色差,浅景深聚焦人物,城市灯光周围有柔和光晕。可见模拟胶片颗粒,栏杆漆面的微观肌理与空气中的灰尘粒子散射增强了真实感,都市独处的静谧与内省。"
+
+✅ 英文提示词(与中文一一对应,学习导演视角):
+
+"A contemplative young woman, mid-20s, with a naturalistic, slightly melancholic expression, leans gently on the cool, weathered metal pedestrian overpass railing, her delicate hands subtly gripping the worn surface. She gazes down at the mesmerizing flow of rush hour traffic below, a symphony of red taillights and white headlights blurring into streaks. Her hair, slightly disheveled by the evening breeze, frames a face with visible skin pores, subtle peach fuzz, and finely detailed eyes reflecting the distant city lights. A slightly oversized knit wool sweater, its fine texture visible, has its collar gently ruffled by the wind. The weathered railing paint texture anchors the foreground, her silhouette occupies the midground, and the sprawling city with gradually illuminating skyscraper windows and a breathtaking pink and purple sunset fills the background. Soft, diffused dusk light mingles with the emerging artificial city glow, casting long, volumetric shadows through atmospheric haze. In the cinematography of Darius Khondji - mixed color temperature of natural dusk and artificial sources, restrained and precise exposure, conveying an urban realist emotional depth. The color grading features crushed deep indigo-blue shadows with slightly lifted blacks preserving shadow detail and a cool teal bias, desaturated concrete tones, with warm golden and magenta highlights from the sunset and artificial light sources, a subtle teal-orange split. Shot on Panavision Panaflex with Kodak Vision3 500T film stock, 50mm spherical lens at f/2.0, organic sharpness with slight edge softness rather than clinical sharpness, subtle chromatic aberration, shallow depth of field focusing on the subject, soft halation around the city lights. Visible analog film grain, micro-details on the railing's worn paint, and atmospheric scattering of dust particles enhance the realism, conveying urban solitude and quiet introspection."
+
+注意这些关键写法:1先写人物的神态和动作(导演看见了什么),再自然展开环境和光线--不是"A medium shot of..."开头 2技术术语织进叙述流--"她的瞳孔映着城市微光"比"eye reflection: city lights"自然得多 3"红色尾灯与白色车头灯"--术语准确,不是"红绿灯" 4全景(full shot)和"前景栏杆+中景人物+远景城市"逻辑自洽,景别信息自然蕴含在描述中 5Khondji是DP(自己掌镜),直接写"cinematography of Darius Khondji" 6忠于原文--原文说"女生"就写young woman,不擅自加silk dress/trench coat等原文没有的细节 7焦段+光圈同时标注--"50mm f/2.0"而非只写"50mm" 8胶片摄影机+胶片型号自洽--Panavision Panaflex配Kodak Vision3 500T,而非Arri Alexa配胶片 9暗部写色彩倾向+lifted--"crushed deep indigo-blue shadows with slightly lifted blacks preserving shadow detail",不能只写"deep shadows" 10镜头写性格--"organic sharpness with slight edge softness"而非只写"sharp",真镜头不完美
+
+## 风格设定
+${styleMap[style] ? '出图风格:' + styleMap[style] : '根据描述智能匹配最佳风格'}
+
+## 镜头设定
+${cameraMap[camera] ? '镜头景别:' + cameraMap[camera] : '根据画面内容智能选择最佳景别'}
+
+## 输出格式(严格遵守,格式错误=无效输出)
+
+你必须严格按以下格式输出完整内容,---CHINESE---和---ENGLISH---标记不能遗漏,两个版本内容必须完全对应:
+
+---CHINESE---
+[中文提示词:一段完整的专业描述,200-350字。必须深入展开每个维度的具体细节(见「细节展开规则」),不能一句话带过。必须包含以下全部维度:1主体描述+景别(主体必须具体到面容/服装/姿势细节)2空间纵深(必须有具体前景元素+中景+远景)3光影叙事(光线来源+色温+光比+落点)4色彩系统(冷暖对比的具体画面+胶片型号或数字色彩科学)5镜头参数(焦段+光圈+镜头类型+相机/摄影机,含镜头性格特征如轻微边缘柔化/色差,必须自洽--数字相机不配胶片型号!❌Arri Alexa+Kodak胶片)6肌理质感(按场景选用微观细节)7空气氛围(具体可见的粒子/雾/散射)8导演/DP风格锚点(根据场景匹配,注意导演≠DP,写法如"杜可风式的摄影,呈现王家卫的情绪美学")9胶片质感+品质标签]
+
+---ENGLISH---
+[English prompt: a complete professional description, 200-350 words. Every dimension must be expanded with concrete visual details (see "Detail Expansion Rules"), not just one-liners. Must be entirely in English with no Chinese characters.]
+
+## 提示词写作规范
+- 中文版和英文版必须严格一一对应,包含完全相同的专业维度,不能一个写成散文、一个写成技术规格
+- **字数硬指标**:英文版 200-350 词,中文版 200-350 字。达不到字数说明细节展开不够
+- **写法核心:导演视角**--先写你"看见"的(人物/动作/环境),技术术语自然织入叙述,不要按维度逐条填写
+  - ❌ 景别开头:先写"A medium shot of..."或"A wide-angle shot of..." → 镜头说明书
+  - ❌ 检查表:先写景别,再写前景,再写光线,再写色彩,再写胶片,再写镜头 → 读起来像产品规格书
+  - ✅ 导演视角:从人物动作和神态出发 → 自然带出环境/光线/色彩 → 质感/胶片/镜头参数在叙述中有机融入 → 以情绪收尾
+- 中文版:使用专业摄影/电影术语的中文表达,遵循上述写作方法论和细节展开规则
+  - 中文版必须包含(缺一不可):主体+景别(面容/服装/姿势具体到肉眼可见)、空间纵深(有具体前景元素)、光影叙事(色温+光比+落点)、色彩系统+胶片型号(冷暖对比的具体画面,暗部必须有色彩倾向如青色/靛蓝+slightly lifted blacks防止死黑)、镜头参数(焦段+光圈+镜头类型+相机/摄影机+镜头性格特征如有机锐度/轻微色差/边缘柔化,数字相机配数字色彩科学、胶片相机配胶片型号)、肌理质感(具体到什么材质什么纹理)、空气氛围(能看见的粒子/雾/散射)、导演/DP锚点(根据场景情绪匹配,注意区分导演和DP--如"杜可风摄影"而非"王家卫摄影")、胶片质感+品质标签
+  - 中文版术语示例:约3200K钨丝灯光、高光比、明暗对比法、体积光散射、模拟胶片颗粒、变形宽银幕镜头、青色暗部、暖色光晕
+- 英文版:必须使用专业词汇库中的具体术语,禁止笼统描述
+  - ❌ 禁止:cinematic lighting, warm tone, detailed skin, high quality → 太笼统
+  - ✅ 必须:practical motivated lighting from car headlights, high lighting ratio, Kodak Vision3 500T color science → 具体、场景适配
+  - ✅ 主体:a young man, approximately 18-22, with visible pores and subtle peach fuzz, wears a well-worn baseball cap pulled low → 具体到肉眼可见
+- 英文版必须引用至少一位导演/DP作为风格锚点--选择标准是**情绪和调性匹配**,不是场景关键词匹配,更不是无脑默认。见上方「导演/DP风格锚点」完整库中的常见错误和匹配规则
+  - **导演vs DP写法**:引用DP的cinematography风格,同时可以提及导演的美学方向。如"cinematography of Christopher Doyle, evoking the atmospheric aesthetic of Wong Kar-wai" 而非 "Wong Kar-wai style lighting"(王家卫不亲自掌镜)
+  - 纯DP(自己掌镜布光):Deakins, Khondji, Lubezki, Savides, Doyle, Müller, Kamiński, van Hoytema → 可直接写"cinematography of Deakins"
+  - 导演+DP组合:王家卫→Doyle, 诺兰→Hoyte van Hoytema/Deakins, 科波拉→Willis, 侯孝贤→李屏宾 → 写"cinematography of [DP], evoking [导演]'s vision"
+- 品质标签:cinematic, professional grading, 4k, detailed
+- 英文版必须全部使用英文,不能出现任何中文字符
+- ⚠️ 一致性铁律:先写中文版,确保9个维度齐全且每个维度都展开了具体细节,再写英文版作为中文版的逐句专业术语升级翻译--两者是同一幅画面的同一套技术参数,只是语言不同
+${state.altStyleEnabled ? `
+## ✨ Alternative Prompt
+
+输出完---CHINESE---和---ENGLISH---后,输出一个风格完全不同的替代提示词(同一画面,至少改3项:导演/胶片/色彩/光线/镜头/氛围):
+
+${state.currentTab === 'en' ? '---ENGLISH---\n[Alternative English prompt]' : state.currentTab === 'cn' ? '---CHINESE---\n[替代风格中文提示词]' : '---CHINESE---\n[替代风格中文提示词]\n---ENGLISH---\n[Alternative English prompt]'}` : ''}`;
+}
+
+function buildUserPrompt(input) {
+  let prompt = input;
+  // Reference image is handled in callAPI() for vision models
+  return prompt;
+}
+
+function buildVideoSystemPrompt(style, cameraMovement, role, pacing) {
+  const styleMap = {
+    'auto': '',
+    'cinematic': '胶片电影风格--追求电影级画质,强调胶片色彩科学、自然光效、叙事性构图、有机质感,杜绝数码感',
+    'tvc': 'TVC广告风格--追求商业级精致画质,强调精准控光、高饱和色彩、锐利细节、品牌级画面质感',
+    'iphone': 'iPhone拍摄风格--追求真实生活感,强调自然光影、轻微镜头瑕疵、纪实感、日常美学、Smart HDR特征'
+  };
+  const cameraMap = {
+    'auto': '', 'static': '固定镜头', 'pan': '水平摇镜(Pan)',
+    'tilt': '垂直摇镜(Tilt)', 'dolly-in': '推镜头(Dolly In)',
+    'dolly-out': '拉镜头(Dolly Out)', 'tracking': '跟拍(Tracking)',
+    'crane': '摇臂镜头(Crane)', 'handheld': '手持晃动(Handheld)',
+    'steadicam': '稳定器跟拍(Steadicam)', 'drone': '航拍(Drone)',
+    'orbit': '环绕拍摄(Orbit)', 'whip-pan': '甩镜(Whip Pan)',
+    'dutch-roll': '旋转倾斜(Dutch Roll)', 'zoom': '变焦(Zoom)'
+  };
+  const roleMap = {
+    'cinematographer': '摄影指导--精通运镜语言与光影叙事,确保每个镜头的运动都有情感动机',
+    'director': '导演--以叙事与节奏为核心,注重场景调度、演员表演提示和情绪递进',
+    'editor': '剪辑师--精通转场技巧与节奏把控,注重镜头衔接的流畅性和叙事张力',
+    'vfx-supervisor': '特效总监--擅长视觉特效描述与合成方案,注重粒子、流体、光影等动态特效',
+    'colorist': '调色师--精通色彩心理学与色彩叙事,注重色调随时间的变化和氛围营造',
+    'sound-designer': '声音设计师--注重音画同步,善于用声音暗示运动、空间和情绪'
+  };
+  const pacingMap = {
+    'auto': '', 'slow': '慢节奏--抒情沉浸,长镜头为主,画面停留感强',
+    'medium': '中等节奏--叙事展示,镜头切换适度,信息量均衡',
+    'fast': '快节奏--动作冲击,快速剪辑,短镜头密集,视觉冲击力强',
+    'variable': '变速节奏--先慢后快或先快后慢,制造戏剧张力',
+    'rhythmic': '律动节奏--节拍驱动,镜头切换与音乐节拍同步'
+  };
+  const modelMap = {
+    'kling': 'Kling 3.0', 'seedance': 'Seedance 2.0'
+  };
+
+  const storyboardInstruction = state.segmentedMode ? `
+## 🎬 自动分镜模式(用户已开启,你必须执行以下流程)
+
+**Step 1:判断是否需要多镜头**
+分析用户描述,判断单镜头能否完整表达。以下情况需要多镜头:
+- 时长 > 6秒 且 有明确的情节变化(如从静到动、从远到近)
+- 包含对话/对峙场景(需要正反打)
+- 有空间移动(人物从A点到B点)
+- 有情绪递进(从平静到爆发)
+以下情况保持单镜头:
+- 纯氛围/风景镜头(无情节变化)
+- 时长 ≤ 6秒
+- 用户明确要求单镜头
+- 画面内容单一(只有一个人做一件事)
+
+**Step 2:如果判断为多镜头,执行分镜**
+- 根据叙事节奏分配每个镜头的时长(不是等分!情绪高潮的镜头给更长时间)
+- 每次切换必须同时改变景别和运镜方式(不能连续两个镜头用同样的景别+运镜)
+- 按时间顺序输出,格式:【起始秒-结束秒】描述内容
+
+**Step 3:输出格式**
+多镜头时按时间段分段输出,每段包含完整的画面描述:
+
+---CHINESE---
+【0-3s】景别:xxx | 运镜:xxx | 主体与动作:xxx | 光线:xxx | 色调:xxx | 情绪:xxx
+【3-7s】景别:xxx | 运镜:xxx | 主体与动作:xxx | 光线:xxx | 色调:xxx | 情绪:xxx
+【7-10s】景别:xxx | 运镜:xxx | 主体与动作:xxx | 光线:xxx | 色调:xxx | 情绪:xxx
+
+---ENGLISH---
+[0-3s] Shot: xxx | Camera: xxx | Subject: xxx | Lighting: xxx | Color: xxx | Mood: xxx
+[3-7s] Shot: xxx | Camera: xxx | Subject: xxx | Lighting: xxx | Color: xxx | Mood: xxx
+[7-10s] Shot: xxx | Camera: xxx | Subject: xxx | Lighting: xxx | Color: xxx | Mood: xxx
+
+单镜头时使用标准七维度格式(不分段)。` : '';
+
+  const normalFormat = `
+## 输出格式(严格遵守,格式错误=无效输出)
+
+你必须严格按以下七维度标签格式输出,---CHINESE---和---ENGLISH---标记不能遗漏,两个版本内容必须完全对应:
+
+---CHINESE---
+景别:
+主体与动作:
+构图:
+光线:
+色调 / 色彩:
+运镜:
+情绪 / 氛围:
+
+---ENGLISH---
+Shot Size:
+Subject & Action:
+Composition:
+Lighting:
+Color / Tone:
+Camera Movement:
+Mood / Atmosphere:`;
+
+  return `你是一位世界级的AI写实视频提示词${roleMap[role] || '专家'}。你的任务是把用户的描述**补全**为合格的写实视频生成提示词。
+
+## 🔒 硬约束 - 风格与色彩锁定
+
+1. **仅限写实摄影/视频风格** - 输出必须是真实拍摄质感的画面描述。禁止生成3D渲染、动画、卡通、像素画等非实拍风格。
+2. **必须是彩色画面** - 禁止生成黑白、单色、灰度画面。即使场景是夜晚、阴天,也必须保留可见的彩色元素。
+3. **一次输出** - 直接生成完整的提示词,不需要多轮对话。
+
+## 🎯 核心方法论:补全,不是重写
+
+用户丢过来的原始描述,大概率是不完整的。你要做的是**把它补全到合格**。
+
+合格的提示词基底要覆盖以下七个维度:
+1. **景别**(特写 / 近景 / 中景 / 全景 / 远景)
+2. **主体与动作**(画面里是谁,在做什么)
+3. **构图**(人物位置、前后景关系、画面重心)
+4. **光线**(方向、色温、软硬、光比)
+5. **色调/色彩**(整体色调倾向、关键色彩对比)
+6. **运镜**(固定 / 推 / 拉 / 横移 / 升降 / 手持 / 跟拍,以及节奏)
+7. **情绪/氛围**(这个画面要让观众感受到什么)
+
+打磨规则:
+- 用户原文中已经说清楚的维度--**保留用户的措辞和意图**,不要改写
+- 用户没提到的维度--**根据上下文和创作意图合理补全**,但也不要凭空出现无关的东西
+
+## ⛔ 绝对禁令(违反即失败)
+1. 禁止重写用户已有的描述--用户说"短发女生倚靠车头",你不能改成"长发女性站在车旁"
+2. 禁止对人像以外的场景使用人像布光术语(Rembrandt / butterfly / catch light 等仅适用于人像)
+3. 禁止使用笼统词:cinematic lighting, warm tone, high quality
+4. 禁止中文版和英文版内容不一致--两个版本画面内容必须完全对应
+5. 禁止AI生成陈词滥调 - hyper-detailed, ultra-detailed, ultra-realistic, photorealistic, 8K, 4K, masterpiece, best quality
+6. 禁止数字相机+胶片型号矛盾 - Arri Alexa/RED/Sony Venice是数字摄影机,不能搭配Kodak Vision3/Portra等胶片型号!两者只能选一个体系
+7. 禁止中文式英语翻译 - 用自然的电影英语,不是逐字翻译
+8. 禁止胶片处理瑕疵过大 - 胶片颗粒OK,轻微halation OK,但大面积漏光/发白/化学灼烧严禁
+9. 禁止暗部死黑不通透 - 阴影必须有色彩倾向(cyan/indigo/teal),必须写"slightly lifted blacks"或"shadow detail preserved"
+10. 禁止黑白/近黑白画面 - 视频画面必须是彩色的
+11. 禁止空洞修饰词 - breathtaking, stunning, captivating, mesmerizing, 令人叹为观止, 令人震撼, 视觉盛宴
+
+## 🔍 场景原型路由器
+
+在写提示词前,先判断场景属于哪个原型,这决定了运镜逻辑和时间结构:
+
+### 动作原型
+| 原型 | 判断条件 | 运镜焦点 |
+|---|---|---|
+| 追逐 | 有人追/被追 | 距离收窄/拉开,路径变化 |
+| 对决 | 双方交替占优 | 权力转换时摄影机过轴 |
+| 冲击 | 单一致命接触 | 蓄力慢→命中快→余波慢 |
+
+### 通用原型
+| 原型 | 判断条件 | 运镜标志 |
+|---|---|---|
+| 旅程 | 主体在空间中移动 | 跟拍、航拍、并行 |
+| 氛围 | 无变化,情绪即内容 | 最小运动,缓慢推进或静态 |
+| 揭示 | 某物从隐藏变为可见 | 横摇、摇臂升降、推镜头揭示 |
+
+### 对话原型
+| 原型 | 判断条件 | 运镜标志 |
+|---|---|---|
+| 对峙 | 双方推进,主导权交替 | 过肩镜头,权力转换时过轴 |
+| 审讯 | 一方索取,一方抗拒 | 问话者低角度,沉默时推进 |
+| 谈判 | 双方各有所求 | 对称构图,相同景别 |
+
+## 🧠 内部推理(INTERNAL REASONING - 不要出现在最终输出中)
+
+在写提示词之前,你 MUST 先完成内部推理:
+1. **场景原型**:这个场景属于哪个原型?→ 决定运镜逻辑和时间结构
+2. **情绪识别**:核心情绪是什么?→ 决定运镜节奏和色彩基调
+3. **光源盘点**:场景中有哪些光源?色温、方向、强度?→ 禁止臆造不存在的光源
+4. **色彩策略**:暖色从哪来?冷色在哪?冷暖对比的空间关系?→ 必须有具体来源
+5. **运动分析**:主体怎么动?速度、方向、力度?→ 写运动过程,不写静止状态
+6. **环境动态**:风/光/水/烟雾怎么变化?→ 这是视频区别于图片的核心
+7. **技术体系**:胶片还是数字?相机+镜头怎么组合?→ 必须自洽
+
+## 📐 视频提示词写作规范
+
+### 主体运动:写过程,不写状态
+- ❌ "女生回头看" → 静止状态,没有时间维度
+- ✅ "女生缓缓转头,视线先落在远处,再移向镜头,嘴角微微上扬后又收回" → 有过程、有节奏、有微表演
+- 运动描述必须包含:方向、速度、力度、中途变化
+- 微表情写物理表现:"下颌收紧,鼻孔翕动",不写"看起来生气"
+
+### 环境动态:写变化,不写静态
+- ❌ "风吹过树叶" → 静态描述
+- ✅ "晚风从画面左侧渐起,树叶先轻摇后大幅摆动,地面光斑随之晃动" → 有起始、有变化、有因果
+- 必须描述:风向/风速变化、光影移动、水面波动、烟雾飘散方向
+
+### 运镜:写意图和质量,不只写类型
+- ❌ "tracking shot" → 只有类型
+- ✅ "a slow, deliberate tracking shot that gradually accelerates as the subject picks up pace" → 有速度变化、有意图、与主体配合
+- 运镜必须写:速度(慢/快/变速)、方向、与主体运动的关系
+
+### 时间节奏:镜头内部有起承转合
+- 一个镜头内部也有节奏变化:前段铺垫 → 中段展开 → 末段留白或转折
+- 写出"画面中发生了什么变化":光线从暖变冷?人物从静到动?景深从实变虚?
+
+### 其他规范
+- **情绪必须写物理外化,禁止文学化** - "情绪/氛围"维度只能写摄像机能看到的身体反应和物理变化。❌"怒火让表情尖锐" ✅"眉心皱紧,下颌肌肉绷起,鼻孔翕动" ❌"冰冷的漩涡" ✅"两人僵持不动,只有胸口急促起伏" ❌"字从牙缝里挤出来" ✅"咬紧牙关,每个音节之间下颌绷紧"。规则:删掉句子中所有比喻("像...""仿佛...""如同..."),剩下的如果还是具体物理描述就对了,如果什么都不剩就说明原文是废的
+- 中文版和英文版必须一一对应,描述的是同一个画面的同一组信息,只是语言不同
+- 英文版必须全部使用英文,不能出现任何中文字符
+- 专业术语按风格选用:胶片电影风格用胶片/镜头术语,iPhone风格用手机摄影术语,不要串风格
+- 摄影师/DP锚点:场景匹配才引用,不匹配不硬加
+- 运镜必须有方向和速度(❌"camera moves" ✅"camera slowly tracks right")
+- 英文提示词 150-250 词(分段模式每段 60-90 词)
+
+### 台词与对白:标点是表演指令
+如果画面中包含对话或台词,标点不是排版,是演员节拍:
+| 标点 | 表演含义 | 提示词写法 |
+|---|---|---|
+| , | 小停顿、试探、忍住情绪 | 停顿0.2-0.5秒,眼神轻微变化 |
+| 。 | 情绪落地、克制、确认 | 尾音下落或收住,表情停留 |
+| ! | 重音加压、警告、震惊 | 指定重音词,避免全程喊叫 |
+| ? | 怀疑、试探、脆弱追问 | 尾音轻微上扬,眼神寻找反应 |
+| ...... | 情绪卡在喉咙里 | 呼吸中断、吞咽、嘴唇微张后停住 |
+| -- | 转折、打断、真相延迟 | 前半句被截断,后半句换气或变声线 |
+- 台词必须用英文双引号包裹嵌入提示词
+- 每句台词必须绑定:表情状态 + 声音状态 + 标点节奏
+- 台词时长计算:舒缓3字/秒,正常4.4字/秒,紧张5字/秒;镜头时长 ≥ 台词字数/语速 + 停顿 + 反应时间
+
+### 情绪弧线:写过程,不写标签
+文戏情绪不是"悲伤"一个词,而是有时间线的过程:
+**触发事件 → 第一认知反应 → 身体泄漏 → 压抑/伪装 → 失控点 → 情绪残留**
+- 5秒镜头:中性 → 触发 → 第一泄漏 → 残留
+- 8秒镜头:中性 → 触发 → 认知 → 压住 → 可见裂缝
+- 10秒镜头:中性 → 触发 → 反应 → 压住 → 第一次失控 → 残留
+- 重要台词后必须留0.5-2秒反应时间(问句后看对方反应、省略号后允许喉咙/呼吸/眼神完成停顿、真相揭示后先不反应再让理解进入眼睛)
+
+### 抽象→具象转译(写可拍、可听的行为)
+| 抽象描写 | 具象转译 |
+|---|---|
+| 内心崩溃 | 眼神失焦,嘴唇微张,呼吸停一拍,手指失去力气 |
+| 强忍泪水 | 下眼睑发红,鼻尖微红,嘴唇压紧不动 |
+| 心动 | 视线短暂下移再上移,呼吸慢半拍,指尖无意识摩挲杯沿 |
+| 故作冷静 | 声音过稳,手指节奏比平时快,眼神不敢久停 |
+| 愤怒压住 | 下颌收紧,语速变慢,最后几个字压得更重 |
+| 迟来的理解 | 先无反应,眼神停住,嘴唇轻微分开,呼吸变浅 |
+
+### 1+3+1+1 镜头控制公式(防过载)
+每个镜头只锁定,不要把所有表情词堆满:
+- **1 个核心情绪机制**(压抑型/反讽型/延迟型/权力型/空白型/回暖型,只选1个)
+- **最多 3 个微表情锚点**(眼睛/下眼睑/眉/嘴唇/下颌/喉咙/呼吸/身体,选3个写)
+- **1 个声音节奏重点**(省略号卡住/问号尾音上扬/句号压低落地,只选1个)
+- **1 个镜头语言目的**(让观众看见压抑/表达关系隔阂/表达权力压迫/表达孤立/表达迟来的理解,只选1个)
+
+### 三层负面词(必须包含)
+**Layer 1 基础负面词**:avoid deformed hands, avoid distorted face, avoid proportion errors, avoid blurry focus, avoid excessive smoothing, avoid watermarks, avoid extra characters, avoid random camera movement
+**Layer 2 类型专属负面词**:
+- 文戏:avoid sudden crying, avoid one-step emotion, avoid exaggerated eye widening, avoid constant shouting, avoid lip-sync mismatch, avoid forced smiles, avoid blank no-emotion face
+- 动作:avoid floating physics, avoid impossible joint angles, avoid speed inconsistency
+- 氛围:avoid empty static frames, avoid mood-breaking color shifts
+**Layer 3 场景专属负面词**:根据当前场景动态生成最可能失败的3-5条
+
+### 动作戏写作规范
+如果画面包含打斗、追逐、格斗、动作场面,必须遵循以下原则:
+
+**物理重量感**:每一击必须有肉感反作用力--拳脚接触时身体凹陷、衣袂随发力鼓荡、重心崩溃感、被击退的惯性。❌"出拳击中" → ✅"右拳猛击对方肋部,对方身体向左弯折,衣料被冲击波掀起,脚步踉跄后退两步"
+
+**惯性连贯**:动作之间不是切换,是惯性带动--前招余势带出后招起势,像水流不像PPT翻页。写清"借着旋转的惯性接上踢"而非"然后踢出"。
+
+**节奏对比**:动作戏不能全程一个速度。必须有慢镜/正常/凝固至少两档节奏交替--慢镜蓄力→正常爆发→凝固冲击→慢镜余波。写出"快慢交替的呼吸感"。
+
+**环境参与**:环境不是背景,是动作的参与者。人物撞墙→墙灰掉落;出拳带风→雨水被吹散;脚踩桌面→杯子震倒。写清动作和环境的互相影响。
+
+**决定性瞬间**:每个动作镜头必须有至少1处让观众屏息的电影海报级一帧--拳头停在鼻尖前1厘米、刀锋擦过脸颊、雨滴凝固在半空、眼神在极限中凝视。
+
+**人物极限状态**:打斗中的人物不是机器人,要有身体极限的表达--喘息、汗水、颤抖的手、咬紧的牙关、瞳孔收缩。
+
+### 动作导演/武指风格锚点
+| 武指/导演 | 风格特征 | 适用场景 |
+|---|---|---|
+| 袁和平 | 东方武术美学、丝带般的流畅、以柔克刚、轻功飘逸 | 武侠、古装、东方美学 |
+| 成龙 | 环境道具即兴、幽默与危险并存、梯子/椅子/晾衣杆皆武器 | 都市动作、喜剧动作 |
+| 甄子丹 | MMA实战感、近身肉搏、快节奏连击、肌肉碰撞 | 格斗、现代实战 |
+| 87eleven (Chad Stahelski) | 枪斗术+近身格斗、长镜头动作、精准编舞 | 枪战、John Wick式 |
+| 突袭 (Gareth Evans) | 密闭空间肉搏、印尼格斗术、极致暴力美学 | 密闭空间、暴力美学 |
+| 卧虎藏龙 (袁和平+李安) | 武术即情感表达、竹林轻功、屋顶追逐 | 武侠浪漫、诗意动作 |
+
+## 🎨 风格设定
+${styleMap[style] ? '出图风格:' + styleMap[style] : '根据描述智能匹配最佳风格'}
+
+## 🎥 运镜设定
+${cameraMap[cameraMovement] ? '运镜方式:' + cameraMap[cameraMovement] : '根据画面内容智能选择最佳运镜'}
+
+## ⏱ 节奏设定
+${pacingMap[pacing] ? '镜头节奏:' + pacingMap[pacing] : '根据场景智能匹配最佳节奏'}
+
+## 📚 参考词汇库(选用原则:有需要才用,不需要不硬塞)
+
+### 运镜词汇
+dolly in/out, tracking shot, pan/tilt, crane shot, handheld, steadicam, drone/aerial, orbit, whip pan, zoom, static, slow push, pull back reveal, follow focus, rack focus
+
+### 光线词汇(按场景选用)
+**人像**:Rembrandt lighting, catch light, hair light, butterfly lighting
+**通用**:rim light, practical light, motivated lighting, chiaroscuro, negative fill
+**风景/外景**:volumetric light, god ray, golden hour, blue hour, atmospheric scattering, overcast diffuse
+**室内/夜景**:mixed color temperature, practical light sources, tungsten balance, CTO/CTB gel
+
+### 🎞️ 胶片型号(按场景选用)
+**夜景/室内/都市黄昏**:Kodak Vision3 500T(暖色光晕+青色暗部), CineStill 800T(强烈光晕+卤化银残留)
+**日景/户外**:Kodak Vision3 250D(细腻还原+干净高光), Fujifilm Eterna 250D(清洁+精准色彩)
+**人像/肤色**:Portra 400(温暖肤色+柔和对比), Fujifilm Pro 400H(清淡+过曝美感)
+**复古/年代**:Kodachrome 64(浓郁红黄+硬对比)
+**iPhone风格**:禁止使用任何胶片型号!用Smart HDR/computational photography
+
+### 📷 相机/摄影机(按风格选用)
+**电影**:Arri Alexa LF/Mini LF(14+档宽容度), RED V-Raptor(8K锐利), Sony Venice 2(双ISO)
+**胶片**:Panavision Panaflex(35mm经典), Arriflex 435(35mm高速), Bolex H16(16mm粗糙)
+**IMAX**:IMAX MSM 9802(65mm/15孔超大画幅)
+**人像/精致**:Hasselblad 500C/M(6×6中画幅)
+**街头/人文**:Leica M6(35mm旁轴), Leica M11(数字旁轴)
+**iPhone**:iPhone 15 Pro(Smart HDR+计算摄影)
+
+### 🔭 焦段选择(焦段+景别必须匹配)
+**14-24mm**:超广角/远景/建筑(边缘变形)| **28-35mm**:广角/全景/街头叙事 | **50mm**:标准/中景/万能 | **85mm**:中长焦/近景/人像 | **135mm+**:长焦/特写/压缩
+
+### 🔍 镜头类型(按风格选用)
+**胶片电影**:anamorphic(椭圆焦外+水平光晕), spherical, vintage/Super Speed, Cooke S4/i, Panavision C-Series
+**TVC商业**:Zeiss Master Prime, spherical, crisp bokeh, sharp focus
+**复古/实验**:Lomo Anamorphic, Helios 44-2, Petzval
+**iPhone**:iPhone wide (28mm equiv.), iPhone tele (77mm equiv.)--禁止电影镜头
+
+### 质感词汇
+**胶片电影风格**:film grain, analog noise, halation, vignette, 35mm look, **slightly lifted blacks preserving shadow detail**, organic sharpness with slight edge softness, subtle chromatic aberration
+${storyboardInstruction || normalFormat}`;
+}
+
+function buildVideoUserPrompt(input) {
+  let prompt = input;
+  // Reference image is handled in callAPI() for vision models
+  return prompt;
+}
+
+// ===== API CALL =====
+async function callAPI(systemPrompt, userPrompt) {
+  const config = state.apiConfig;
+
+  if (!config.apiKey) {
+    throw new Error('请先在设置中配置 API Key');
+  }
+
+  const messages = [
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: userPrompt }
+  ];
+
+  // If reference image exists, add it as a vision message (only for vision-capable models)
+  const visionModels = ['mimo-v2.5-pro','mimo-v2.5','glm-4.6v-flash','glm-4.1v-thinking-flash','sensenova-6.7-flash-lite','gpt-4o','gpt-4.1','gpt-5'];
+  const isVisionModel = visionModels.some(vm => config.model.includes(vm));
+  if (state.referenceImageBase64 && isVisionModel) {
+    messages[1] = {
+      role: 'user',
+      content: [
+        { type: 'text', text: userPrompt + '\n\n[参考图说明]请仔细分析用户上传的参考图,提取以下视觉元素并在提示词中体现:1.主体姿态与服装细节2.光线方向、色温与光比3.色彩系统(主色/辅色/点缀色)4.构图方式与空间纵深5.镜头焦段与景深6.整体氛围与情绪基调。提示词应与参考图的视觉语言保持一致。' },
+        { type: 'image_url', image_url: { url: state.referenceImageBase64 } }
+      ]
+    };
+  }
+
+  const abortController = new AbortController();
+  state._abortController = abortController;
+
+  const response = await fetch(config.apiBase + '/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + config.apiKey
+    },
+    body: JSON.stringify({
+      model: config.model,
+      messages: messages,
+      temperature: 0.8,
+      max_tokens: 8192
+    }),
+    signal: abortController.signal
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error?.message || `API 请求失败 (${response.status})`);
+  }
+
+  const data = await response.json();
+  return data.choices[0].message.content;
+}
+
+// Fallback: local prompt generation when API is unavailable
+function generateLocally(systemPrompt, userPrompt) {
+  const input = document.getElementById('userInput').value.trim();
+
+  if (state.mode === 'video') {
+    const style = document.getElementById('videoStylePreset').value;
+    const camera = document.getElementById('cameraMovement').value;
+    const pacing = document.getElementById('videoPacing').value;
+
+    const styleKeywords = {
+      'cinematic': 'cinematic narrative, film grain, anamorphic lens, Kodak Vision3 color science, organic texture',
+      'tvc': 'commercial production, razor-sharp detail, high saturation, studio-grade color grading, premium feel',
+      'iphone': 'natural daylight, slight lens imperfection, Smart HDR, everyday authenticity, documentary feel'
+    };
+
+    const cameraKeywords = {
+      'static': 'static tripod shot, locked frame, stable composition',
+      'pan': 'smooth horizontal pan, sweeping landscape reveal',
+      'dolly-in': 'slow dolly in, approaching subject, narrowing focus',
+      'dolly-out': 'dolly out, revealing wider scene, expanding context',
+      'tracking': 'tracking shot, following subject movement, parallel motion',
+      'drone': 'aerial drone shot, bird\'s eye sweeping view, ascending reveal',
+      'orbit': 'orbital shot, 360° rotation around subject, dynamic perspective',
+      'steadicam': 'steadicam walk, smooth floating movement, fluid navigation',
+      'handheld': 'handheld camera, slight shake, documentary immediacy'
+    };
+
+    const pacingKeywords = {
+      'slow': 'slow contemplative pace, long takes, lingering shots',
+      'medium': 'medium narrative pace, balanced editing rhythm',
+      'fast': 'fast dynamic pace, quick cuts, rapid movement',
+      'variable': 'variable pace, slow to fast acceleration, building tension'
+    };
+
+    const sk = styleKeywords[style] || styleKeywords['cinematic'];
+    const ck = cameraKeywords[camera] || cameraKeywords['dolly-in'];
+    const pk = pacingKeywords[pacing] || pacingKeywords['medium'];
+
+    if (state.segmentedMode) {
+      const cnPrompt = `【0-5s】${input},开场画面,${ck.includes('dolly') ? '镜头缓缓推入' : ck.includes('drone') ? '航拍俯瞰开场' : '镜头平稳开启'},${sk.includes('cinematic') ? '电影级光影' : '精心布光'},氛围营造。\n【5-10s】画面推进,主体动态变化,运镜过渡,光影随场景演变,${pk.includes('slow') ? '节奏舒缓沉稳' : pk.includes('fast') ? '节奏加快推进' : '节奏平稳推进'}。\n【10-15s】场景收束,情绪落点,运镜收尾,${sk.includes('cinematic') ? '电影感色调渐变' : '氛围升华'},画面定格或过渡。`;
+      const enPrompt = `[0-5s] ${input}, opening shot, ${ck}, ${sk}, atmospheric lighting, scene establishment.\n[5-10s] Visual progression, subject movement development, camera transition, lighting evolution, ${pk}.\n[10-15s] Scene resolution, emotional landing, camera wrap, atmospheric culmination, cinematic, smooth motion, high quality, 4k, professional, detailed`;
+      return `---CHINESE---\n${cnPrompt}\n\n---ENGLISH---\n${enPrompt}`;
+    } else {
+      const cnPrompt = `${input},${sk.includes('cinematic') ? '电影叙事质感' : '专业视频风格'},${ck.includes('dolly') ? '推拉运镜' : ck.includes('drone') ? '航拍视角' : ck.includes('tracking') ? '跟拍运动' : '精细运镜设计'},光影随时间演变,主体动态流畅,${pk.includes('slow') ? '节奏舒缓沉浸' : pk.includes('fast') ? '节奏紧凑冲击' : '节奏流畅叙事'},声音氛围丰富,大师级视频品质。`;
+      const enPrompt = `${input}, ${sk}, ${ck}, ${pk}, lighting evolution, smooth subject motion, rich sound atmosphere, cinematic, smooth motion, high quality, 4k, professional, detailed`;
+      return `---CHINESE---\n${cnPrompt}\n\n---ENGLISH---\n${enPrompt}`;
+    }
+  }
+
+  const style = document.getElementById('stylePreset').value;
+  const camera = document.getElementById('cameraConfig').value;
+
+  const styleKeywords = {
+    'cinematic': 'cinematic lighting, film grain, anamorphic lens, Kodak Vision3 color science, organic texture, lifted shadows, warm halation',
+    'tvc': 'commercial lighting, razor-sharp detail, high saturation, studio-grade color grading, product-ready, pristine highlights',
+    'iphone': 'natural daylight, slight lens imperfection, Smart HDR, everyday authenticity, documentary feel, casual composition'
+  };
+
+  const cameraKeywords = {
+    'extreme-close-up': 'extreme close-up shot, macro detail, ECU',
+    'close-up': 'close-up portrait, shallow depth of field, bokeh',
+    'medium': 'medium shot, waist-up framing, natural perspective',
+    'full-shot': 'full body shot, complete figure, environmental context',
+    'wide-shot': 'wide angle shot, expansive vista, establishing shot',
+    'bird-eye': "bird's eye view, overhead perspective, top-down angle",
+    'low-angle': 'low angle shot, heroic perspective, looking upward',
+    'fisheye': 'fisheye lens, barrel distortion, ultra-wide 180° view',
+    'macro': 'macro photography, extreme magnification, razor thin DOF'
+  };
+
+  const sk = styleKeywords[style] || styleKeywords['cinematic'];
+  const ck = cameraKeywords[camera] || cameraKeywords['medium'];
+
+  const cnPrompt = `${input}。${style === 'cinematic' ? '胶片电影质感,自然光效叙事' : style === 'tvc' ? 'TVC广告级精致画质,商业控光' : 'iPhone纪实拍摄风格,真实生活感'},${ck.includes('close-up') ? '特写镜头捕捉细腻细节' : ck.includes('wide') ? '宽广视角呈现宏大场景' : '精心构图'},光线考究,色调和谐,层次丰富,细节精致,专业品质。`;
+
+  const enPrompt = `${input}, ${sk}, ${ck}, dramatic lighting, color harmony, rich layers, exquisite detail, masterpiece, best quality, highly detailed, 8k uhd, professional, award-winning`;
+
+  return `---CHINESE---\n${cnPrompt}\n\n---ENGLISH---\n${enPrompt}`;
+}
+
+// ===== PARSE RESULT =====
+function parseResult(result) {
+ let cnText = '', enText = '';
+
+ // JSON mode: need to separate the two JSON versions
+ if (state.targetModel === 'json') {
+  // Check for marker format in result
+  const cnMatch = result.match(/---CHINESE---\s*([\s\S]*?)(?=---ENGLISH---|$)/);
+  const enMatch = result.match(/---ENGLISH---\s*([\s\S]*?)(?=---LINT|---END LINT|$)/);
+
+  if (cnMatch && cnMatch[1].trim()) {
+   cnText = cnMatch[1].trim();
+  }
+  if (enMatch && enMatch[1].trim()) {
+   enText = enMatch[1].trim();
+  }
+
+  // If no markers found, check if result starts with { (raw JSON without markers)
+  if (!cnText && !enText && result.trim().startsWith('{')) {
+   cnText = result.trim();
+   enText = result.trim();
+  }
+
+  // Ensure both boxes have content
+  if (!cnText) cnText = enText;
+  if (!enText) enText = cnText;
+
+  document.getElementById('cnOutput').value = cnText;
+  document.getElementById('enOutput').value = enText;
+  // Parse LINT and ALT for JSON mode too
+  const lintMatchJ = result.match(/---LINT-{2,4}\s*([\s\S]*?)(?:---END LINT---|---ALTERNATIVE---|---CHINESE---|$)/);
+  const lintBlockJ = document.getElementById('lintBlock');
+  const lintOutputJ = document.getElementById('lintOutput');
+  if (lintMatchJ && lintMatchJ[1].trim()) { let lt = lintMatchJ[1].trim().replace(/^[-\s]+/, ''); if (!lt.includes('\n[') && !lt.includes('\n- [')) lt = lt.replace(/\s*-?\s*\[/g, '\n['); lintOutputJ.value = lt.trim(); lintBlockJ.style.display = ''; autoResizeTextarea(lintOutputJ); } else { lintBlockJ.style.display = 'none'; lintOutputJ.value = ''; }
+  const allCnJ = [...result.matchAll(/---CHINESE---\s*([\s\S]*?)(?=---ENGLISH---|---LINT|---END LINT|---ALTERNATIVE|$)/g)];
+  const allEnJ = [...result.matchAll(/---ENGLISH---\s*([\s\S]*?)(?=---CHINESE---|---LINT|---END LINT|---ALTERNATIVE|$)/g)];
+  const altDirectMatchJ = result.match(/---ALTERNATIVE[-]*---\s*([\s\S]*?)$/);
+  const altBlockJ = document.getElementById('altBlock');
+  if (allCnJ.length >= 2) { document.getElementById('altCnOutput').value = allCnJ[1][1].trim(); altBlockJ.style.display = ''; autoResizeTextarea(document.getElementById('altCnOutput')); } else if (altDirectMatchJ && altDirectMatchJ[1].trim()) { document.getElementById('altCnOutput').value = altDirectMatchJ[1].trim(); altBlockJ.style.display = ''; autoResizeTextarea(document.getElementById('altCnOutput')); } else { altBlockJ.style.display = 'none'; document.getElementById('altCnOutput').value = ''; }
+  if (allEnJ.length >= 2) { document.getElementById('altEnOutput').value = allEnJ[1][1].trim(); autoResizeTextarea(document.getElementById('altEnOutput')); } else { document.getElementById('altEnOutput').value = ''; }
+  autoResizeTextarea(document.getElementById('cnOutput'));
+  autoResizeTextarea(document.getElementById('enOutput'));
+  return;
+ }
+
+ // Standard mode: try to parse ---CHINESE--- and ---ENGLISH--- sections
+ // (rest of the original function continues below)
+  const cnMatch = result.match(/---CHINESE---\s*([\s\S]*?)(?=---ENGLISH---|$)/);
+  const enMatch = result.match(/---ENGLISH---\s*([\s\S]*?)(?=---LINT|---END LINT|$)/);
+
+  if (cnMatch && enMatch && cnMatch[1].trim() && enMatch[1].trim()) {
+    cnText = cnMatch[1].trim();
+    enText = enMatch[1].trim();
+  } else if (cnMatch && cnMatch[1].trim()) {
+    // Has Chinese section but English section is missing or empty
+    cnText = cnMatch[1].trim();
+    // Try to find English text after Chinese section
+    const afterChinese = result.substring(result.indexOf('---CHINESE---') + 13);
+    const englishStart = afterChinese.search(/[A-Z][a-z].*[a-z]{3,}/);
+    if (englishStart > 0) {
+      enText = afterChinese.substring(englishStart).trim();
+    }
+  } else {
+    // No format markers at all - try to split by detecting language
+    const lines = result.trim().split('\n');
+    let cnLines = [], enLines = [];
+    let inChinese = true;
+
+    for (const line of lines) {
+      // Detect if line is primarily English (for AI prompt content)
+      const englishRatio = (line.match(/[a-zA-Z]/g) || []).length / Math.max(line.length, 1);
+      if (englishRatio > 0.5 && line.length > 20) {
+        if (inChinese && cnLines.length > 0) inChinese = false;
+        if (!inChinese || cnLines.length === 0) enLines.push(line);
+        else cnLines.push(line);
+      } else {
+        cnLines.push(line);
+        inChinese = true;
+      }
+    }
+
+    cnText = cnLines.join('\n').trim() || result;
+    enText = enLines.join('\n').trim() || result;
+  }
+
+  document.getElementById('cnOutput').value = cnText;
+  document.getElementById('enOutput').value = enText;
+
+  // Parse LINT section (tolerant of format variations)
+  const lintMatch = result.match(/---LINT-{2,4}\s*([\s\S]*?)(?:---END LINT---|---ALTERNATIVE---|---CHINESE---|$)/);
+  const lintBlock = document.getElementById('lintBlock');
+  const lintOutput = document.getElementById('lintOutput');
+  if (lintMatch && lintMatch[1].trim()) {
+    // Normalize: if all on one line, split by "- [" or "[" patterns
+    let lintText = lintMatch[1].trim();
+    // Remove leading dashes and spaces from the captured text
+    lintText = lintText.replace(/^[-\s]+/, '');
+    // If entries are on one line (no newlines between [PASS] or [WARN]), split them
+    if (!lintText.includes('\n[') && !lintText.includes('\n- [')) {
+      lintText = lintText.replace(/\s*-?\s*\[/g, '\n[');
+    }
+    lintOutput.value = lintText.trim();
+    lintBlock.style.display = '';
+    autoResizeTextarea(lintOutput);
+  } else {
+    lintBlock.style.display = 'none';
+    lintOutput.value = '';
+  }
+
+  // Parse Alternative Prompt section (tolerant of format variations)
+  // Strategy: find the second ---CHINESE--- or ---ALTERNATIVE--- block
+  const altBlock = document.getElementById('altBlock');
+  const altCnOutput = document.getElementById('altCnOutput');
+  const altEnOutput = document.getElementById('altEnOutput');
+
+  // Try standard format: second ---CHINESE--- / ---ENGLISH--- pair
+  const allCn = [...result.matchAll(/---CHINESE---\s*([\s\S]*?)(?=---ENGLISH---|---LINT|---END LINT|---ALTERNATIVE|$)/g)];
+  const allEn = [...result.matchAll(/---ENGLISH---\s*([\s\S]*?)(?=---CHINESE---|---LINT|---END LINT|---ALTERNATIVE|$)/g)];
+
+  // Also try ---ALTERNATIVE--- format
+  const altDirectMatch = result.match(/---ALTERNATIVE[-]*---\s*([\s\S]*?)$/);
+
+  if (allCn.length >= 2) {
+    altCnOutput.value = allCn[1][1].trim();
+    altBlock.style.display = '';
+    autoResizeTextarea(altCnOutput);
+  } else if (altDirectMatch && altDirectMatch[1].trim()) {
+    // Fallback: use ---ALTERNATIVE--- content directly
+    altCnOutput.value = altDirectMatch[1].trim();
+    altBlock.style.display = '';
+    autoResizeTextarea(altCnOutput);
+  } else {
+    altBlock.style.display = 'none';
+    altCnOutput.value = '';
+  }
+  if (allEn.length >= 2) {
+    altEnOutput.value = allEn[1][1].trim();
+    autoResizeTextarea(altEnOutput);
+  } else {
+    altEnOutput.value = '';
+  }
+
+  autoResizeTextarea(document.getElementById('cnOutput'));
+  autoResizeTextarea(document.getElementById('enOutput'));
+  document.getElementById('altStyleBtn').style.display = state.altStyleEnabled ? '' : 'none';
+}
+
+// ===== AUTO RESIZE TEXTAREA =====
+function autoResizeTextarea(el) {
+  if (!el) return;
+  el.style.height = 'auto';
+  el.style.height = el.scrollHeight + 'px';
+}
+
+// ===== COPY =====
+function copyText(id) {
+  const text = document.getElementById(id).value;
+  if (!text) { showToast('没有可复制的内容', 'error'); return; }
+  navigator.clipboard.writeText(text).then(() => {
+    showToast('已复制到剪贴板', 'success');
+  }).catch(() => {
+    // Fallback
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    showToast('已复制到剪贴板', 'success');
+  });
+}
+
+function copyAllAlt() {
+  const cn = document.getElementById('altCnOutput').value;
+  const en = document.getElementById('altEnOutput').value;
+  if (!cn && !en) { showToast('没有可复制的内容', 'error'); return; }
+  const all = `【替代风格-中文】\n${cn}\n\n【Alternative Style-EN】\n${en}`;
+  navigator.clipboard.writeText(all).then(() => {
+    showToast('替代风格已复制', 'success');
+  }).catch(() => {
+    showToast('复制失败', 'error');
+  });
+}
+
+async function generateAltStyle() {
+  const cnText = document.getElementById('cnOutput').value;
+  const enText = document.getElementById('enOutput').value;
+  if (!cnText && !enText) { showToast('请先生成主提示词', 'error'); return; }
+
+  const btn = document.getElementById('altStyleBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ 生成中...';
+
+  const langRule = state.currentTab === 'en' ? '只输出英文版(---ENGLISH---)' : state.currentTab === 'cn' ? '只输出中文版(---CHINESE---)' : '输出中文版+英文版(---CHINESE--- + ---ENGLISH---)';
+  const altSystemPrompt = `你是一位世界级的AI提示词风格变体大师。给定一个写实摄影提示词,你需要生成一个画面内容完全相同、但视觉风格截然不同的替代版本。
+
+规则:
+1. 画面内容(主体、动作、环境、文字)完全一致,不能改变
+2. 必须改变以下至少3项:导演/DP锚点、胶片型号/色彩科学、色彩策略、光线风格、镜头选择、空气氛围
+3. 输出格式:${langRule}
+4. 在替代提示词前加一行说明改变了哪些维度
+5. 中文版200-350字,英文版200-350词
+6. 保持原版的专业水准和细节密度
+7. 禁止使用与原版相同的导演/DP、胶片型号、色彩策略`;
+
+  const altUserPrompt = state.currentTab === 'en'
+    ? `以下是原始英文提示词,请生成风格变体:\n\n${enText}`
+    : `以下是原始提示词,请生成风格变体:\n\n${cnText}${enText ? '\n\n' + enText : ''}`;
+
+  try {
+    const config = state.apiConfig;
+    if (!config.apiKey) throw new Error('请先配置 API Key');
+
+    const response = await fetch(config.apiBase + '/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + config.apiKey },
+      body: JSON.stringify({
+        model: config.model,
+        messages: [
+          { role: 'system', content: altSystemPrompt },
+          { role: 'user', content: altUserPrompt }
+        ],
+        temperature: 0.85,
+        max_tokens: 4096
+      })
+    });
+
+    if (!response.ok) throw new Error(`API 错误: ${response.status}`);
+    const data = await response.json();
+    const result = data.choices?.[0]?.message?.content || '';
+
+    // Parse the alternative result
+    const altCnMatch = result.match(/---CHINESE---\s*([\s\S]*?)(?=---ENGLISH---|$)/);
+    const altEnMatch = result.match(/---ENGLISH---\s*([\s\S]*?)$/);
+
+    const altBlock = document.getElementById('altBlock');
+    const altCnOutput = document.getElementById('altCnOutput');
+    const altEnOutput = document.getElementById('altEnOutput');
+
+    if (altCnMatch && altCnMatch[1].trim()) {
+      altCnOutput.value = altCnMatch[1].trim();
+      altBlock.style.display = '';
+      autoResizeTextarea(altCnOutput);
+    }
+    if (altEnMatch && altEnMatch[1].trim()) {
+      altEnOutput.value = altEnMatch[1].trim();
+      autoResizeTextarea(altEnOutput);
+    }
+
+    if (!altCnMatch && !altEnMatch) {
+      // Fallback: put entire result in CN box
+      altCnOutput.value = result;
+      altBlock.style.display = '';
+      autoResizeTextarea(altCnOutput);
+    }
+
+    showToast('替代风格已生成', 'success');
+  } catch (err) {
+    showToast('生成失败: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '✨ 替代风格';
+  }
+}
+
+function copyAll() {
+  const cn = document.getElementById('cnOutput').value;
+  const en = document.getElementById('enOutput').value;
+  if (!cn && !en) { showToast('没有可复制的内容', 'error'); return; }
+  const all = `【中文提示词】\n${cn}\n\n【English Prompt】\n${en}`;
+  navigator.clipboard.writeText(all).then(() => {
+    showToast('全部内容已复制', 'success');
+  }).catch(() => {
+    showToast('复制失败', 'error');
+  });
+}
+
+// ===== SETTINGS =====
+function openSettings() { document.getElementById('settingsModal').classList.add('active'); }
+function closeSettings() { document.getElementById('settingsModal').classList.remove('active'); }
+
+function onProviderChange() {
+  const p = document.getElementById('apiProvider').value;
+  const baseInput = document.getElementById('apiBase');
+  const baseGroup = document.getElementById('apiBaseGroup');
+  const modelInput = document.getElementById('apiModel');
+
+  const configs = {
+    'custom':     { base: 'https://api.openai.com/v1', model: 'gpt-4o', showBase: true },
+    'deepseek':   { base: 'https://api.deepseek.com/v1', model: 'deepseek-v4-pro', showBase: false },
+    'mimo':       { base: 'https://token-plan-cn.xiaomimimo.com/v1', model: 'mimo-v2.5-pro', showBase: false },
+    'ling':       { base: 'https://openapi.aliyuncs.com/api/v3', model: 'Ring-2.6-1T', showBase: false },
+    'zhipu':      { base: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-4.7-flash', showBase: false },
+    'sensenova':  { base: 'https://token.sensenova.cn/v1', model: 'sensenova-6.7-flash-lite', showBase: false },
+    'hunyuan':    { base: 'https://api.hunyuan.cloud.tencent.com/v1', model: 'hunyuan-lite', showBase: false }
+  };
+
+  const c = configs[p] || configs['custom'];
+  baseInput.value = c.base;
+  modelInput.value = c.model;
+  baseGroup.style.display = c.showBase ? '' : 'none';
+  renderModelPresets(p);
+}
+
+function renderModelPresets(provider) {
+  const presetsEl = document.getElementById('modelPresets');
+  if (!presetsEl) return;
+
+  const modelPresets = {
+    'deepseek':   ['deepseek-v4-pro','deepseek-v4-flash'],
+    'mimo':       ['mimo-v2.5-pro','mimo-v2.5','mimo-v2-pro','mimo-v2-omni'],
+    'ling':       ['Ring-2.6-1T','Ling-2.6-1T','Ling-2.6-flash'],
+    'zhipu':      ['glm-4.7-flash','glm-4.6v-flash','glm-4.1v-thinking-flash'],
+    'sensenova':  ['sensenova-6.7-flash-lite'],
+    'hunyuan':    ['hunyuan-lite']
+  };
+
+  const presets = modelPresets[provider] || [];
+  const visionModels = new Set(['mimo-v2.5-pro','mimo-v2.5','glm-4.6v-flash','glm-4.1v-thinking-flash','sensenova-6.7-flash-lite']);
+
+  if (presets.length > 0) {
+    presetsEl.innerHTML = presets.map(m => {
+      const label = visionModels.has(m) ? m + ' 👁' : m;
+      return '<span class="model-preset-chip" onclick="document.getElementById(\'apiModel\').value=\'' + m + '\'">' + label + '</span>';
+    }).join('');
+    presetsEl.style.display = '';
+  } else {
+    presetsEl.innerHTML = '';
+    presetsEl.style.display = 'none';
+  }
+}
+
+function saveSettings() {
+  state.apiConfig = {
+    provider: document.getElementById('apiProvider').value,
+    apiKey: document.getElementById('apiKey').value,
+    apiBase: document.getElementById('apiBase').value,
+    model: document.getElementById('apiModel').value
+  };
+  localStorage.setItem('apiConfig', JSON.stringify(state.apiConfig));
+  saveApiPreset(state.apiConfig);
+  closeSettings();
+  showToast('设置已保存', 'success');
+}
+
+function loadSettings() {
+  const saved = localStorage.getItem('apiConfig');
+  if (saved) {
+    try {
+      state.apiConfig = JSON.parse(saved);
+      document.getElementById('apiProvider').value = state.apiConfig.provider;
+      document.getElementById('apiKey').value = state.apiConfig.apiKey;
+      document.getElementById('apiBase').value = state.apiConfig.apiBase;
+      document.getElementById('apiModel').value = state.apiConfig.model;
+      // 只更新 base 显示和模型预设,不覆盖已保存的值
+      const p = state.apiConfig.provider;
+      const baseGroup = document.getElementById('apiBaseGroup');
+      baseGroup.style.display = (p === 'custom') ? '' : 'none';
+      renderModelPresets(p);
+    } catch(e) {}
+  }
+  loadApiPresets();
+}
+
+// ===== API PRESETS =====
+function getApiPresets() {
+  try {
+    return JSON.parse(localStorage.getItem('apiPresets') || '[]');
+  } catch(e) { return []; }
+}
+
+function saveApiPreset(config) {
+  if (!config.apiBase || !config.model) return;
+  let presets = getApiPresets();
+  const key = config.apiBase.replace(/\/+$/, '') + '|' + config.model;
+  presets = presets.filter(p => (p.apiBase.replace(/\/+$/, '') + '|' + p.model) !== key);
+  let hostname;
+  try { hostname = new URL(config.apiBase).hostname; } catch(e) { hostname = config.apiBase; }
+  presets.unshift({
+    provider: config.provider,
+    apiKey: config.apiKey,
+    apiBase: config.apiBase,
+    model: config.model,
+    label: config.model + ' @ ' + hostname
+  });
+  if (presets.length > 12) presets = presets.slice(0, 12);
+  localStorage.setItem('apiPresets', JSON.stringify(presets));
+  renderApiPresets();
+}
+
+function applyApiPreset(index) {
+  const presets = getApiPresets();
+  const p = presets[index];
+  if (!p) return;
+  state.apiConfig = { provider: p.provider, apiKey: p.apiKey, apiBase: p.apiBase, model: p.model };
+  localStorage.setItem('apiConfig', JSON.stringify(state.apiConfig));
+  document.getElementById('apiProvider').value = p.provider;
+  document.getElementById('apiKey').value = p.apiKey;
+  document.getElementById('apiBase').value = p.apiBase;
+  document.getElementById('apiModel').value = p.model;
+  document.getElementById('apiBaseGroup').style.display = (p.provider === 'custom') ? '' : 'none';
+  renderModelPresets(p.provider);
+  renderApiPresets();
+  showToast('已切换到 ' + p.model, 'success');
+}
+
+function deleteApiPreset(index, e) {
+  e.stopPropagation();
+  let presets = getApiPresets();
+  presets.splice(index, 1);
+  localStorage.setItem('apiPresets', JSON.stringify(presets));
+  renderApiPresets();
+}
+
+function renderApiPresets() {
+  const list = document.getElementById('apiPresetsList');
+  if (!list) return;
+  const presets = getApiPresets();
+  if (presets.length === 0) {
+    list.innerHTML = '<div class="api-presets-empty">保存接口后将在此生成快捷切换按钮</div>';
+    return;
+  }
+  const currentKey = state.apiConfig.apiBase.replace(/\/+$/, '') + '|' + state.apiConfig.model;
+  list.innerHTML = presets.map((p, i) => {
+    const pKey = p.apiBase.replace(/\/+$/, '') + '|' + p.model;
+    const isActive = pKey === currentKey;
+    return '<span class="api-preset-chip' + (isActive ? ' active' : '') + '" onclick="applyApiPreset(' + i + ')">' +
+      escapeHtml(p.label) +
+      '<span class="preset-delete" onclick="deleteApiPreset(' + i + ', event)" title="删除">✕</span>' +
+      '</span>';
+  }).join('');
+}
+
+function loadApiPresets() {
+  renderApiPresets();
+}
+
+// ===== HISTORY =====
+function saveToHistory(input, result) {
+  const entry = {
+    input,
+    result,
+    mode: state.mode,
+    targetModel: state.targetModel,  // 保存目标模型类型,用于恢复时判断
+    time: new Date().toLocaleString()
+  };
+  if (state.mode === 'video') {
+    state.videoHistory.unshift(entry);
+    if (state.videoHistory.length > 50) state.videoHistory.pop();
+    localStorage.setItem('videoPromptHistory', JSON.stringify(state.videoHistory));
+  } else {
+    state.history.unshift(entry);
+    if (state.history.length > 50) state.history.pop();
+    localStorage.setItem('promptHistory', JSON.stringify(state.history));
+  }
+}
+
+function showHistory() {
+  document.getElementById('historyModal').classList.add('active');
+  renderHistoryList();
+  // 确保历史标签按钮正确绑定点击事件
+  document.querySelectorAll('.history-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      switchHistoryTab(tab.dataset.tab);
+    });
+  });
+}
+
+function closeHistory() {
+  document.getElementById('historyModal').classList.remove('active');
+}
+
+function switchHistoryTab(mode) {
+  document.querySelectorAll('.history-tab').forEach(tab => {
+    tab.classList.toggle('active', tab.dataset.tab === mode);
+  });
+  renderHistoryList(mode);
+}
+
+function renderHistoryList(mode = null) {
+  if (!mode) {
+    mode = document.querySelector('.history-tab.active')?.dataset.tab || 'image';
+  }
+
+  const list = document.getElementById('historyList');
+  const empty = document.getElementById('historyEmpty');
+  const history = mode === 'video' ? state.videoHistory : state.history;
+
+  if (history.length === 0) {
+    list.innerHTML = '';
+    empty.style.display = '';
+    return;
+  }
+
+  empty.style.display = 'none';
+  list.innerHTML = history.map((entry, index) => {
+    const preview = entry.result.substring(0, 100).replace(/\n/g, ' ');
+    return `
+      <div class="history-item" onclick="loadFromHistory(${index}, '${mode}')">
+        <div class="history-item-header">
+          <span class="history-item-mode">${mode === 'video' ? '视频' : '绘画'}</span>
+          <span class="history-item-time">${entry.time}</span>
+        </div>
+        <div class="history-item-input">${escapeHtml(entry.input)}</div>
+        <div class="history-item-preview">${escapeHtml(preview)}...</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function loadFromHistory(index, mode) {
+ const history = mode === 'video' ? state.videoHistory : state.history;
+ const entry = history[index];
+ if (!entry) return;
+
+ switchMode(entry.mode);
+ document.getElementById('userInput').value = entry.input;
+ document.getElementById('charCount').textContent = entry.input.length;
+
+ // 恢复目标模型设置 - 查找并点击对应的 model-chip
+ if (entry.targetModel) {
+  const targetChip = document.querySelector(`.model-chip[data-model="${entry.targetModel}"]`);
+  if (targetChip) {
+   selectModel(targetChip);
+  }
+ }
+
+ // JSON 模式特殊处理 - 检查是否是 JSON 模式输出
+ // 使用保存的 targetModel 或者检查 result 内容
+ const isJSONMode = (entry.targetModel === 'json') || (entry.result && (
+   entry.result.trim().startsWith('{') &&
+   (entry.result.includes('"subject":') || entry.result.includes('"primary":'))
+  ));
+
+ if (isJSONMode) {
+  // Try to parse markers first
+  const cnMatch = entry.result.match(/---CHINESE---\s*([\s\S]*?)(?=---ENGLISH---|$)/);
+  const enMatch = entry.result.match(/---ENGLISH---\s*([\s\S]*?)(?=---LINT|---END LINT|$)/);
+
+  let cnText = '', enText = '';
+  if (cnMatch && cnMatch[1].trim()) {
+   cnText = cnMatch[1].trim();
+  }
+  if (enMatch && enMatch[1].trim()) {
+   enText = enMatch[1].trim();
+  }
+
+  // If no markers found, use raw result for both
+  if (!cnText) cnText = entry.result.trim();
+  if (!enText) enText = entry.result.trim();
+
+  document.getElementById('cnOutput').value = cnText;
+  document.getElementById('enOutput').value = enText;
+  document.getElementById('outputEmpty').style.display = 'none';
+  document.getElementById('outputBlocks').style.display = '';
+  autoResizeTextarea(document.getElementById('cnOutput'));
+  autoResizeTextarea(document.getElementById('enOutput'));
+  closeHistory();
+  showToast('已载入历史记录', 'success');
+  return;
+ }
+
+ // Parse the result using the same logic as parseResult
+ let cnText = '', enText = '';
+ const cnMatch = entry.result.match(/---CHINESE---\s*([\s\S]*?)(?=---ENGLISH---|$)/);
+ const enMatch = entry.result.match(/---ENGLISH---\s*([\s\S]*?)(?=---LINT|---END LINT|$)/);
+
+ if (cnMatch && cnMatch[1].trim()) {
+  cnText = cnMatch[1].trim();
+ }
+ if (enMatch && enMatch[1].trim()) {
+  enText = enMatch[1].trim();
+ }
+
+ // If no format markers, try to detect by language
+ if (!cnText || !enText) {
+  const lines = entry.result.trim().split('\n');
+  let cnLines = [], enLines = [];
+  let inChinese = true;
+
+  for (const line of lines) {
+   const englishRatio = (line.match(/[a-zA-Z]/g) || []).length / Math.max(line.length, 1);
+   if (englishRatio > 0.5 && line.length > 20) {
+    if (inChinese && cnLines.length > 0) inChinese = false;
+    if (!inChinese) enLines.push(line);
+    else cnLines.push(line);
+   } else {
+    if (inChinese) cnLines.push(line);
+    else enLines.push(line);
+   }
+  }
+
+  if (!cnText) cnText = cnLines.join('\n').trim();
+  if (!enText) enText = enLines.join('\n').trim();
+ }
+
+ document.getElementById('cnOutput').value = cnText;
+ document.getElementById('enOutput').value = enText;
+
+ // Parse LINT and ALT from history (tolerant)
+ const lintMatch = entry.result.match(/---LINT-{2,4}\s*([\s\S]*?)(?:---END LINT---|---ALTERNATIVE---|---CHINESE---|$)/);
+ const lintBlock = document.getElementById('lintBlock');
+ const lintOutput = document.getElementById('lintOutput');
+ if (lintMatch && lintMatch[1].trim()) {
+   let lt = lintMatch[1].trim().replace(/^[-\s]+/, ''); if (!lt.includes('\n[') && !lt.includes('\n- [')) lt = lt.replace(/\s*-?\s*\[/g, '\n[');
+   lintOutput.value = lt.trim();
+   lintBlock.style.display = '';
+   autoResizeTextarea(lintOutput);
+ } else {
+   lintBlock.style.display = 'none';
+   lintOutput.value = '';
+ }
+ const allCn = [...entry.result.matchAll(/---CHINESE---\s*([\s\S]*?)(?=---ENGLISH---|---LINT|---END LINT|---ALTERNATIVE|$)/g)];
+ const allEn = [...entry.result.matchAll(/---ENGLISH---\s*([\s\S]*?)(?=---CHINESE---|---LINT|---END LINT|---ALTERNATIVE|$)/g)];
+ const altDirectMatch = entry.result.match(/---ALTERNATIVE[-]*---\s*([\s\S]*?)$/);
+ const altBlock = document.getElementById('altBlock');
+ if (allCn.length >= 2) {
+   document.getElementById('altCnOutput').value = allCn[1][1].trim();
+   altBlock.style.display = '';
+   autoResizeTextarea(document.getElementById('altCnOutput'));
+ } else if (altDirectMatch && altDirectMatch[1].trim()) {
+   document.getElementById('altCnOutput').value = altDirectMatch[1].trim();
+   altBlock.style.display = '';
+   autoResizeTextarea(document.getElementById('altCnOutput'));
+ } else { altBlock.style.display = 'none'; document.getElementById('altCnOutput').value = ''; }
+ if (allEn.length >= 2) {
+   document.getElementById('altEnOutput').value = allEn[1][1].trim();
+   autoResizeTextarea(document.getElementById('altEnOutput'));
+ } else { document.getElementById('altEnOutput').value = ''; }
+
+ document.getElementById('outputEmpty').style.display = 'none';
+ document.getElementById('outputBlocks').style.display = '';
+
+ closeHistory();
+ showToast('已载入历史记录', 'success');
+}
+
+function clearHistory() {
+  const mode = document.querySelector('.history-tab.active')?.dataset.tab || 'image';
+  if (!confirm(`确定要清空所有${mode === 'video' ? '视频' : '绘画'}历史记录吗?`)) return;
+
+  if (mode === 'video') {
+    state.videoHistory = [];
+    localStorage.removeItem('videoPromptHistory');
+  } else {
+    state.history = [];
+    localStorage.removeItem('promptHistory');
+  }
+
+  renderHistoryList();
+  showToast('历史记录已清空', 'success');
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// ===== TOAST =====
+function showToast(msg, type = 'success') {
+  const container = document.getElementById('toastContainer');
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  const icon = type === 'success' ? '✓' : type === 'error' ? '✕' : 'i';
+  toast.innerHTML = `<span>${icon}</span> ${msg}`;
+  container.appendChild(toast);
+  setTimeout(() => {
+    toast.style.animation = 'toastOut .3s ease forwards';
+    setTimeout(() => toast.remove(), 300);
+  }, 3000);
+}
+
+// ===== KEYBOARD SHORTCUT =====
+document.addEventListener('keydown', e => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+    e.preventDefault();
+    generatePrompt();
+  }
+  if (e.key === 'Escape') {
+    closeSettings();
+  }
+});
+
+// ===== CUSTOM SELECT LOGIC =====
+(function(){
+  if(window.__csInit) return;
+  window.__csInit = true;
+
+  function closeAll(except){
+    document.querySelectorAll('.custom-select.open').forEach(el=>{
+      if(el!=except) el.classList.remove('open');
+    });
+  }
+
+  document.querySelectorAll('.custom-select').forEach(wrap=>{
+    const trigger = wrap.querySelector('.custom-select-trigger');
+    const optsBox = wrap.querySelector('.custom-select-options');
+    const selId = wrap.id;
+
+    // Compat layer: make wrap.value read/write
+    if(!Object.getOwnPropertyDescriptor(wrap,'value')){
+      Object.defineProperty(wrap,'value',{
+        get() { return this.dataset.value||''; },
+        set(v) {
+          this.dataset.value = v||'';
+          const opt = optsBox.querySelector('.custom-option[data-value="'+v+'"]');
+          if(opt){
+            optsBox.querySelectorAll('.custom-option').forEach(o=>o.classList.remove('selected'));
+            opt.classList.add('selected');
+            trigger.textContent = opt.textContent;
+          }
+        }
+      });
+    }
+    // Init display
+    wrap.value = wrap.dataset.value||'';
+
+    // Click trigger toggle
+    trigger.addEventListener('click',function(e){
+      e.stopPropagation();
+      if(wrap.classList.contains('open')){
+        wrap.classList.remove('open');
+      }else{
+        closeAll(wrap);
+        wrap.classList.add('open');
+        const sel = optsBox.querySelector('.custom-option.selected');
+        if(sel) sel.scrollIntoView({block:'nearest'});
+      }
+    });
+
+    // Click option
+    optsBox.querySelectorAll('.custom-option').forEach(opt=>{
+      opt.addEventListener('click',function(e){
+        e.stopPropagation();
+        wrap.value = this.dataset.value;
+        wrap.classList.remove('open');
+        if(selId==='apiProvider') onProviderChange();
+      });
+    });
+  });
+
+  // Click outside to close all
+  document.addEventListener('click',()=>closeAll(null));
+
+  // Keyboard nav (single listener)
+  if(!window.__csKeyInit){
+    window.__csKeyInit = true;
+    document.addEventListener('keydown',function(e){
+      const openWrap = document.querySelector('.custom-select.open');
+      if(!openWrap) return;
+      const opts = [...openWrap.querySelectorAll('.custom-option')];
+      const selIdx = opts.findIndex(o=>o.classList.contains('selected'));
+      if(e.key==='ArrowDown'){
+        e.preventDefault();
+        const next = opts[selIdx+1]||opts[0];
+        openWrap.value = next.dataset.value;
+        next.scrollIntoView({block:'nearest'});
+      }else if(e.key==='ArrowUp'){
+        e.preventDefault();
+        const prev = opts[selIdx-1]||opts[opts.length-1];
+        openWrap.value = prev.dataset.value;
+        prev.scrollIntoView({block:'nearest'});
+      }else if(e.key==='Enter'){
+        e.preventDefault();
+        openWrap.classList.remove('open');
+        if(openWrap.id==='apiProvider') onProviderChange();
+      }else if(e.key==='Escape'){
+        openWrap.classList.remove('open');
+      }
+    });
+  }
+})();
+</script>
+</body>
+</html>
